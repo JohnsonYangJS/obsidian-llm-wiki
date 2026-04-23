@@ -3,4 +3,4 @@ node_modules/
 
 raw/*.pdf
 raw/*.txt
-raw/assets/
+# raw/assets/ is allowed (small reference images)
