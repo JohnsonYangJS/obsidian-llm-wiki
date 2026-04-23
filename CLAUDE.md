@@ -94,8 +94,36 @@ python3 lint_wiki.py <vault-root>
 
 | 任务 | 频率 | 功能 |
 |------|------|------|
-| Auto-Ingest | 周1/3/5 05:00 | 扫描 `raw/` 新文件，TF-IDF 生成 summary 摘要页 |
+| raw/ 监控 | 每 15 分钟 | 扫描新文件，触发 auto_ingest 生成 summary |
+| Auto-Ingest | 周1/3/5 05:00 | 深度 ingest + 补充关联（备用） |
 | Weekly Lint | 每周日 06:00 | 运行 `lint_wiki.py`，扫描断链/孤儿页/索引同步 |
+
+---
+
+## 🌊 四大内容入库渠道
+
+使用 `ingest_inbound.py` 脚本，配置 Cron 自动轮询：
+
+| 渠道 | 方式 | 说明 |
+|------|------|------|
+| **飞书文件** | 给机器人发文件 / 丢到指定群 | 自动下载到 `raw/`，触发 ingest |
+| **飞书云文档** | 发送链接 `https://xxx.feishu.cn/docx/xxx` | AI 自动抓取正文入库 |
+| **任意 URL** | 发送网页链接 | AI 自动抓取网页正文入库 |
+| **本地/Clipper** | Web Clipper → 保存到 `raw/` | Cron 每 15 分钟扫描新文件 |
+
+### 飞书文件使用方式
+- 在飞书私聊或群里给机器人**发送文件**（PDF、Word、图片等）
+- AI 会自动下载并触发 `auto_ingest.py` 生成 summary
+
+### 飞书云文档使用方式
+- 发送飞书文档链接 → AI 抓取正文，自动入库
+- 支持：docx、wiki、多维表格（bitable）、电子表格（sheets）
+
+### 任意 URL 使用方式
+- 发送任何网页链接 → AI 提取正文，自动入库
+
+### Web Clipper 配置
+Obsidian Web Clipper / Markdownload → **保存路径设为 `raw/`**
 
 ---
 
