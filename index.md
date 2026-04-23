@@ -7,27 +7,28 @@
 ## 主题分类
 
 ### 🤖 AI Agent 工具
-- [[Claude Code 指南]] — AI 编程工具，终端 Agent 代表作
-- [[Hermes Agent]] — 自改进 Agent，带三层记忆系统
-- [[OpenClaw 指南]] — 开源 Agent 框架，支持飞书/微信多渠道
-- [[OpenClaw vs Claude Code]] — 两者定位与分工对比
+- [[claude-code-guide|Claude Code 指南]] — AI 编程工具，终端 Agent 代表作
+- [[hermes-agent|Hermes Agent]] — 自改进 Agent，带三层记忆系统
+- [[openclaw-guide|OpenClaw 指南]] — 开源 Agent 框架，支持飞书/微信多渠道
+- [[openclaw-vs-claude-code|OpenClaw vs Claude Code]] — 两者定位与分工对比
 
 ### 🧠 知识管理
-- [[Obsidian AI 指南]] — 本地笔记工具，Markdown 优先
-- [[LLM Wiki 模式]] — Karpathy 提出的 AI 自管理知识库
-- [[第二大脑]] — AI 辅助知识管理的理念与实践
+- [[obsidian-ai-guide|Obsidian AI 指南]] — 本地笔记工具，Markdown 优先
+- [[llm-wiki-pattern|LLM Wiki 模式]] — Karpathy 提出的 AI 自管理知识库
+- [[second-brain|第二大脑]] — AI 辅助知识管理的理念与实践
 
 ### 📊 预测市场
-- [[Polymarket 指南]] — 预测市场平台，USDC 交易
+- [[polymarket-guide|Polymarket 指南]] — 预测市场平台，USDC 交易
 
 ### 🔧 开发工具
-- [[MCP 模型上下文协议]] — 连接 AI 与外部工具的标准协议
-- [[Skills 系统]] — AI Agent 的能力扩展机制
-- [[Harness 工程]] — 为 AI 构建工具链的方法论
+- [[mcp-model-context-protocol|MCP 模型上下文协议]] — 连接 AI 与外部工具的标准协议
+- [[skills-system|Skills 系统]] — AI Agent 的能力扩展机制
+- [[harness-engineering|Harness 工程]] — 为 AI 构建工具链的方法论
 
 ## 最近更新
 
 - 2026-04-23：初始化知识库，摄入花叔橙皮书 PDF 全集
+- 2026-04-23：补充 5 个缺失 wiki 页面（Harness 工程、MCP 协议、OpenClaw vs Claude Code、Skills 系统、第二大脑）
 
 ## 快速导航
 
