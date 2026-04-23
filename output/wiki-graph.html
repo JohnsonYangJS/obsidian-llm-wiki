@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wiki 图谱 — LLM Wiki</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; font-family: -apple-system, sans-serif; overflow: hidden; }
+  svg { width: 100vw; height: 100vh; }
+
+  .node circle {
+    stroke: #fff;
+    stroke-width: 1.5px;
+    cursor: pointer;
+    transition: stroke-width 0.2s;
+  }
+  .node circle:hover { stroke-width: 3px; }
+  .node text {
+    fill: #e0e0ff;
+    font-size: 11px;
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  }
+  .link {
+    stroke: #4a4a7a;
+    stroke-opacity: 0.6;
+    stroke-width: 1px;
+  }
+  .link.highlighted { stroke: #9d8fff; stroke-opacity: 1; stroke-width: 2px; }
+  .panel { stroke-opacity: 0.9; }
+
+  #tooltip {
+    position: fixed;
+    background: #2a2a4a;
+    border: 1px solid #6c5cf5;
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #e0e0ff;
+    font-size: 13px;
+    pointer-events: none;
+    display: none;
+    max-width: 280px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    z-index: 100;
+  }
+  #tooltip .title { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: #fff; }
+  #tooltip .type { font-size: 11px; color: #9d8fff; margin-bottom: 6px; }
+  #tooltip .links-to { color: #888; font-size: 11px; }
+
+  #legend {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(30,30,60,0.9);
+    border: 1px solid #4a4a7a;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #e0e0ff;
+    font-size: 12px;
+    line-height: 1.8;
+  }
+  #legend .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  #stats {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    background: rgba(30,30,60,0.9);
+    border: 1px solid #4a4a7a;
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: #e0e0ff;
+    font-size: 12px;
+    text-align: right;
+  }
+  #stats .num { font-size: 22px; font-weight: 700; color: #9d8fff; }
+  #stats .label { color: #888; font-size: 11px; }
+
+  #controls {
+    position: fixed;
+    top: 16px;
+    left: 20px;
+    display: flex;
+    gap: 8px;
+  }
+  #controls button {
+    background: #2a2a4a;
+    border: 1px solid #6c5cf5;
+    color: #e0e0ff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  #controls button:hover { background: #3a3a6a; }
+
+  #search {
+    position: fixed;
+    top: 16px;
+    left: 160px;
+    background: #2a2a4a;
+    border: 1px solid #6c5cf5;
+    color: #e0e0ff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 200px;
+    outline: none;
+  }
+  #search::placeholder { color: #888; }
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <button onclick="resetView()">重置视图</button>
+  <button onclick="toggleLabels()">隐藏/显示标签</button>
+  <input id="search" placeholder="搜索页面…" oninput="onSearch(this.value)">
+</div>
+
+<div id="stats">
+  <div class="num" id="nodeCount">0</div>
+  <div class="label">个页面</div>
+  <div class="num" id="edgeCount" style="font-size:16px;margin-top:4px">0</div>
+  <div class="label">条链接</div>
+</div>
+
+<div id="legend">
+  <div><span class="dot" style="background:#6c5cf5"></span>概念页 / 总览页</div>
+  <div><span class="dot" style="background:#4eff9c"></span>Summary 摘要页</div>
+  <div><span class="dot" style="background:#ff9c4e"></span>指南页</div>
+  <div><span class="dot" style="background:#ff6b9c"></span>其他</div>
+</div>
+
+<div id="tooltip">
+  <div class="title" id="tt-title"></div>
+  <div class="type" id="tt-type"></div>
+  <div class="links-to" id="tt-links"></div>
+</div>
+
+<svg id="svg"></svg>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ── Data ────────────────────────────────────────────────────────────────────
+const NODES = [
+  {id:"index",label:"总索引",type:"overview",color:"#6c5cf5",size:14},
+  {id:"claude-code-guide",label:"Claude Code 指南",type:"concept",color:"#6c5cf5",size:10},
+  {id:"hermes-agent",label:"Hermes Agent",type:"concept",color:"#6c5cf5",size:10},
+  {id:"llm-wiki-pattern",label:"LLM Wiki 模式",type:"concept",color:"#6c5cf5",size:10},
+  {id:"openclaw-guide",label:"OpenClaw 指南",type:"concept",color:"#ff9c4e",size:10},
+  {id:"obsidian-ai-guide",label:"Obsidian AI 指南",type:"concept",color:"#6c5cf5",size:9},
+  {id:"polymarket-guide",label:"Polymarket 指南",type:"concept",color:"#6c5cf5",size:9},
+  {id:"mcp-model-context-protocol",label:"MCP 协议",type:"concept",color:"#6c5cf5",size:9},
+  {id:"skills-system",label:"Skills 系统",type:"concept",color:"#6c5cf5",size:9},
+  {id:"second-brain",label:"第二大脑",type:"concept",color:"#6c5cf5",size:9},
+  {id:"harness-engineering",label:"Harness Engineering",type:"concept",color:"#6c5cf5",size:9},
+  {id:"openclaw-vs-claude-code",label:"OpenClaw vs Claude Code",type:"concept",color:"#6c5cf5",size:9},
+  {id:"claude-code-complete-guide-zh-v260411",label:"Claude Code 完全指南(中)",type:"summary",color:"#4eff9c",size:7},
+  {id:"claude-code-source-analysis-zh-v260411",label:"Claude Code 源码分析(中)",type:"summary",color:"#4eff9c",size:7},
+  {id:"claude-code-source-code-analysis-v260411",label:"Claude Code 源码分析",type:"summary",color:"#4eff9c",size:7},
+  {id:"claude-code-the-complete-guide-v260411",label:"Claude Code 完全指南",type:"summary",color:"#4eff9c",size:7},
+  {id:"hermes-agent-the-complete-guide-v260407",label:"Hermes Agent 完全指南",type:"summary",color:"#4eff9c",size:7},
+  {id:"hermes-agent-从入门到精通-v260407",label:"Hermes Agent 从入门到精通",type:"summary",color:"#4eff9c",size:7},
+  {id:"openclaw-complete-guide-zh-v140",label:"OpenClaw 完全指南(中)",type:"summary",color:"#4eff9c",size:7},
+  {id:"openclaw-the-complete-guide-v260411",label:"OpenClaw 完全指南",type:"summary",color:"#4eff9c",size:7},
+  {id:"obsidian-ai-the-complete-guide-v100",label:"Obsidian AI 完全指南",type:"summary",color:"#4eff9c",size:7},
+  {id:"obsidian-ai-v100",label:"Obsidian AI 指南(中)",type:"summary",color:"#4eff9c",size:7},
+  {id:"polymarket-complete-guide-zh-v200",label:"Polymarket 完全指南(中)",type:"summary",color:"#4eff9c",size:7},
+  {id:"polymarket-the-complete-guide-v260411",label:"Polymarket 完全指南",type:"summary",color:"#4eff9c",size:7},
+];
+
+const LINKS = [
+  {source:"index",target:"claude-code-guide"},
+  {source:"index",target:"hermes-agent"},
+  {source:"index",target:"llm-wiki-pattern"},
+  {source:"index",target:"openclaw-guide"},
+  {source:"index",target:"obsidian-ai-guide"},
+  {source:"index",target:"polymarket-guide"},
+  {source:"index",target:"second-brain"},
+  {source:"index",target:"mcp-model-context-protocol"},
+  {source:"index",target:"skills-system"},
+  {source:"index",target:"harness-engineering"},
+  {source:"index",target:"openclaw-vs-claude-code"},
+  {source:"claude-code-guide",target:"hermes-agent"},
+  {source:"claude-code-guide",target:"mcp-model-context-protocol"},
+  {source:"claude-code-guide",target:"openclaw-vs-claude-code"},
+  {source:"hermes-agent",target:"openclaw-guide"},
+  {source:"hermes-agent",target:"llm-wiki-pattern"},
+  {source:"hermes-agent",target:"claude-code-guide"},
+  {source:"llm-wiki-pattern",target:"second-brain"},
+  {source:"llm-wiki-pattern",target:"obsidian-ai-guide"},
+  {source:"llm-wiki-pattern",target:"claude-code-guide"},
+  {source:"mcp-model-context-protocol",target:"claude-code-guide"},
+  {source:"mcp-model-context-protocol",target:"openclaw-guide"},
+  {source:"mcp-model-context-protocol",target:"llm-wiki-pattern"},
+  {source:"mcp-model-context-protocol",target:"skills-system"},
+  {source:"openclaw-guide",target:"hermes-agent"},
+  {source:"openclaw-guide",target:"obsidian-ai-guide"},
+  {source:"openclaw-guide",target:"claude-code-guide"},
+  {source:"openclaw-guide",target:"skills-system"},
+  {source:"openclaw-vs-claude-code",target:"hermes-agent"},
+  {source:"openclaw-vs-claude-code",target:"openclaw-guide"},
+  {source:"openclaw-vs-claude-code",target:"claude-code-guide"},
+  {source:"openclaw-vs-claude-code",target:"skills-system"},
+  {source:"obsidian-ai-guide",target:"second-brain"},
+  {source:"obsidian-ai-guide",target:"llm-wiki-pattern"},
+  {source:"obsidian-ai-guide",target:"claude-code-guide"},
+  {source:"second-brain",target:"hermes-agent"},
+  {source:"second-brain",target:"openclaw-guide"},
+  {source:"second-brain",target:"llm-wiki-pattern"},
+  {source:"second-brain",target:"obsidian-ai-guide"},
+  {source:"skills-system",target:"openclaw-guide"},
+  {source:"skills-system",target:"mcp-model-context-protocol"},
+  {source:"skills-system",target:"llm-wiki-pattern"},
+  {source:"skills-system",target:"harness-engineering"},
+  {source:"harness-engineering",target:"openclaw-guide"},
+  {source:"harness-engineering",target:"llm-wiki-pattern"},
+  {source:"harness-engineering",target:"claude-code-guide"},
+  {source:"harness-engineering",target:"skills-system"},
+];
+
+// ── D3 Force Graph ──────────────────────────────────────────────────────────
+const svg = d3.select("#svg");
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+// Build degree map
+const degree = {};
+NODES.forEach(n => degree[n.id] = 0);
+LINKS.forEach(l => {
+  degree[l.source] = (degree[l.source] || 0) + 1;
+  degree[l.target] = (degree[l.target] || 0) + 1;
+});
+
+// Node radius by degree
+function nodeRadius(d) {
+  const base = NODES.find(n => n.id === d.id)?.size || 6;
+  const boost = Math.min(degree[d.id] * 1.5, 8);
+  return base + boost;
+}
+
+const simulation = d3.forceSimulation(NODES)
+  .force("link", d3.forceLink(LINKS).id(d => d.id).distance(90).strength(0.4))
+  .force("charge", d3.forceManyBody().strength(-250))
+  .force("center", d3.forceCenter(width / 2, height / 2))
+  .force("collision", d3.forceCollide().radius(d => nodeRadius(d) + 15))
+  .alphaDecay(0.03);
+
+const link = svg.append("g")
+  .selectAll("line")
+  .data(LINKS)
+  .join("line")
+  .attr("class", "link");
+
+const node = svg.append("g")
+  .selectAll("g")
+  .data(NODES)
+  .join("g")
+  .attr("class", "node")
+  .call(d3.drag()
+    .on("start", (event, d) => {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x; d.fy = d.y;
+    })
+    .on("drag", (event, d) => { d.fx = event.x; d.fy = event.y; })
+    .on("end", (event, d) => {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null; d.fy = null;
+    })
+  );
+
+node.append("circle")
+  .attr("r", d => nodeRadius(d))
+  .attr("fill", d => d.color)
+  .on("mouseover", showTooltip)
+  .on("mousemove", moveTooltip)
+  .on("mouseout", hideTooltip)
+  .on("dblclick", openPage);
+
+const labelVisible = { value: true };
+node.append("text")
+  .attr("dy", d => nodeRadius(d) + 13)
+  .attr("text-anchor", "middle")
+  .text(d => d.label)
+  .style("display", null);
+
+simulation.on("tick", () => {
+  link
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x)
+    .attr("y2", d => d.target.y);
+  node.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+// ── Tooltip ─────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById("tooltip");
+const ttTitle = document.getElementById("tt-title");
+const ttType = document.getElementById("tt-type");
+const ttLinks = document.getElementById("tt-links");
+
+function getRelated(id) {
+  const related = [];
+  LINKS.forEach(l => {
+    if (l.source.id === id) related.push(l.target.label);
+    if (l.target.id === id) related.push(l.source.label);
+  });
+  return related;
+}
+
+function showTooltip(event, d) {
+  const related = getRelated(d.id);
+  ttTitle.textContent = d.label;
+  const typeNames = {overview:"总索引",concept:"概念页",summary:"摘要页",guide:"指南页"};
+  ttType.textContent = `${typeNames[d.type] || d.type} · ${degree[d.id]} 个链接`;
+  ttLinks.textContent = related.length ? `→ ${related.join(", ")}` : "无链接";
+  tooltip.style.display = "block";
+  // Highlight connected links
+  link.classed("highlighted", l => l.source.id === d.id || l.target.id === d.id);
+  node.style("opacity", n => {
+    if (n.id === d.id) return 1;
+    if (related.includes(n.label)) return 1;
+    return 0.25;
+  });
+}
+
+function moveTooltip(event) {
+  tooltip.style.left = (event.pageX + 14) + "px";
+  tooltip.style.top = (event.pageY - 10) + "px";
+}
+
+function hideTooltip() {
+  tooltip.style.display = "none";
+  link.classed("highlighted", false);
+  node.style("opacity", null);
+}
+
+function openPage(event, d) {
+  // Map node id to Obsidian file path
+  const SUMMARY_MAP = {
+    "claude-code-complete-guide-zh-v260411": "wiki/articles/summaries/claude-code-complete-guide-zh-v260411.md",
+    "claude-code-source-analysis-zh-v260411": "wiki/articles/summaries/claude-code-source-analysis-zh-v260411.md",
+    "claude-code-source-code-analysis-v260411": "wiki/articles/summaries/claude-code-source-code-analysis-v260411.md",
+    "claude-code-the-complete-guide-v260411": "wiki/articles/summaries/claude-code-the-complete-guide-v260411.md",
+    "hermes-agent-the-complete-guide-v260407": "wiki/articles/summaries/hermes-agent-the-complete-guide-v260407.md",
+    "hermes-agent-从入门到精通-v260407": "wiki/articles/summaries/hermes-agent-从入门到精通-v260407.md",
+    "openclaw-complete-guide-zh-v140": "wiki/articles/summaries/openclaw-complete-guide-zh-v140.md",
+    "openclaw-the-complete-guide-v260411": "wiki/articles/summaries/openclaw-the-complete-guide-v260411.md",
+    "obsidian-ai-the-complete-guide-v100": "wiki/articles/summaries/obsidian-ai-the-complete-guide-v100.md",
+    "obsidian-ai-v100": "wiki/articles/summaries/obsidian-ai-v100.md",
+    "polymarket-complete-guide-zh-v200": "wiki/articles/summaries/polymarket-complete-guide-zh-v200.md",
+    "polymarket-the-complete-guide-v260411": "wiki/articles/summaries/polymarket-the-complete-guide-v260411.md",
+  };
+  const CONCEPT_MAP = {
+    "index": "wiki/index.md",
+    "claude-code-guide": "wiki/claude-code-guide.md",
+    "hermes-agent": "wiki/hermes-agent.md",
+    "llm-wiki-pattern": "wiki/llm-wiki-pattern.md",
+    "openclaw-guide": "wiki/openclaw-guide.md",
+    "obsidian-ai-guide": "wiki/obsidian-ai-guide.md",
+    "polymarket-guide": "wiki/polymarket-guide.md",
+    "mcp-model-context-protocol": "wiki/mcp-model-context-protocol.md",
+    "skills-system": "wiki/skills-system.md",
+    "second-brain": "wiki/second-brain.md",
+    "harness-engineering": "wiki/harness-engineering.md",
+    "openclaw-vs-claude-code": "wiki/openclaw-vs-claude-code.md",
+  };
+  const path = SUMMARY_MAP[d.id] || CONCEPT_MAP[d.id];
+  if (path) {
+    window.location.href = `obsidian://open?vault=Obsidian%20Vault&file=${encodeURIComponent(path)}`;
+  }
+}
+
+// ── Controls ────────────────────────────────────────────────────────────────
+function resetView() {
+  simulation.alpha(1).restart();
+}
+
+function toggleLabels() {
+  labelVisible.value = !labelVisible.value;
+  node.selectAll("text").style("display", labelVisible.value ? null : "none");
+}
+
+function onSearch(q) {
+  if (!q) {
+    node.style("opacity", null);
+    link.style("opacity", null);
+    return;
+  }
+  const ql = q.toLowerCase();
+  const matches = NODES.filter(n => n.label.toLowerCase().includes(ql) || n.id.includes(ql));
+  const matchIds = new Set(matches.map(m => m.id));
+  node.style("opacity", d => matchIds.has(d.id) ? 1 : 0.1);
+  link.style("opacity", l => (matchIds.has(l.source.id) || matchIds.has(l.target.id)) ? 0.8 : 0.05);
+}
+
+// Stats
+document.getElementById("nodeCount").textContent = NODES.length;
+document.getElementById("edgeCount").textContent = LINKS.length;
+
+// Resize
+window.addEventListener("resize", () => {
+  simulation.force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2));
+  simulation.alpha(0.3).restart();
+});
+</script>
+</body>
+</html>
