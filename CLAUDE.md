@@ -94,8 +94,8 @@ python3 lint_wiki.py <vault-root>
 
 | 任务 | 频率 | 功能 |
 |------|------|------|
+| Auto-Ingest | 周1/3/5 05:00 | 扫描 `raw/` 新文件，TF-IDF 生成 summary 摘要页 |
 | Weekly Lint | 每周日 06:00 | 运行 `lint_wiki.py`，扫描断链/孤儿页/索引同步 |
-| *(Auto-Ingest 规划中)* | 周1/3/5 05:00 | 扫描 `raw/` 新文件，自动创建 Wiki 页面 |
 
 ---
 
