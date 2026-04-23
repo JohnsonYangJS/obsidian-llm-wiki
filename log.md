@@ -12,6 +12,6 @@
 2026-04-23T14:27:00+08:00  CONFIG  初始化 LLM Wiki 系统
 2026-04-23T16:42:00+08:00  UPDATE  升级 SCHEMA.md 至完整版（补充身份定义、三大工作流详细步骤、质量规则）
 2026-04-23T16:42:00+08:00  UPDATE  升级 CLAUDE.md（补充关键 hook 句、完整工作流步骤）
-2026-04-23T16:42:00+08:00  BUILD   Obsidian Git 插件安装 + GitHub 仓库推送（yjs760601/obsidian-llm-wiki）
+2026-04-23T16:42:00+08:00  BUILD   Obsidian Git 插件安装 + GitHub 仓库推送（JohnsonYangJS/obsidian-llm-wiki）
 2026-04-23T16:44:00+08:00  LINT    首次 Lint 发现 5 个断裂链接：index.md 引用了不存在的 wiki 页面
 2026-04-23T16:47:00+08:00  LINT    修复断裂链接：新建 5 个缺失页面（mcp-model-context-protocol, skills-system, harness-engineering, second-brain, openclaw-vs-claude-code），修正 index.md 链接格式

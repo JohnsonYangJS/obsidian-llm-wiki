@@ -67,4 +67,4 @@
 
 ---
 
-*报告由 benchmark_rag.py 自动生成 | github.com/yjs760601/obsidian-llm-wiki*
+*报告由 benchmark_rag.py 自动生成 | github.com/JohnsonYangJS/obsidian-llm-wiki*
