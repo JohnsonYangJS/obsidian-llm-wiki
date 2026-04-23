@@ -471,22 +471,37 @@ tags: [web]
 
 def channel_watcher(watch_dir: str = None, dry_run: bool = False):
     """
-    监控 raw/ 目录新增文件，触发 auto_ingest
+    监控 raw/ 和 Clippings/ 目录新增文件，触发 auto_ingest
     基于 mtime 检测上次运行后新增的文件
     """
-    watch = Path(watch_dir or str(RAW_DIR))
+    watch_dirs = [Path(watch_dir)] if watch_dir else [RAW_DIR, RAW_DIR.parent / "Clippings"]
     manifest = load_manifest()
-    last_run = manifest.get("last_run")
     last_mtime = float(manifest.get("watcher_mtime", 0))
 
     new_files = []
-    for f in watch.rglob("*"):
-        if f.is_file() and f.stat().st_mtime > last_mtime:
-            new_files.append(f)
+    for wd in watch_dirs:
+        if not wd.exists():
+            continue
+        for f in wd.rglob("*"):
+            if f.is_file() and f.suffix in (".md", ".txt") and f.stat().st_mtime > last_mtime:
+                new_files.append(f)
 
     if not new_files:
         log("watcher: 无新文件")
         return
+
+    # Move Clippings files to raw/articles/
+    clippings_dir = RAW_DIR.parent / "Clippings"
+    for f in list(new_files):
+        if f.parent == clippings_dir:
+            target = RAW_DIR / "articles" / f.name
+            if not dry_run:
+                import shutil
+                shutil.copy2(f, target)
+                log(f"  从 Clippings 迁移: {f.name} → raw/articles/")
+            else:
+                log(f"  [DRY-RUN] 迁移: {f.name}")
+            new_files = [target if x == f else x for x in new_files]
 
     manifest["watcher_mtime"] = datetime.now().timestamp()
     save_manifest(manifest)

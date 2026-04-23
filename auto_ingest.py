@@ -79,6 +79,8 @@ import math
 
 def extract_top_concepts(text: str, top_n: int = 8) -> list[str]:
     """Extract top concept keywords from text using TF-IDF."""
+    # Strip frontmatter so TF-IDF only runs on real content
+    text = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.DOTALL)
     sentences = re.split(r"[。！？\n]+", text)
     sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
     if not sentences:
@@ -117,6 +119,8 @@ def clean_ocr_text(text: str) -> str:
 
 def extract_summary(text: str, max_chars: int = 500) -> str:
     """Extract lead paragraph + key sentences as a summary."""
+    # Strip frontmatter
+    text = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.DOTALL)
     text = clean_ocr_text(text)
     lines = [l.strip() for l in text.split("\n") if l.strip() and len(l.strip()) > 15]
     skip_pattern = re.compile(r"^[A-Z\s]{5,}$|^[─=\s]+$|^ORANGE\s*BOOK|^PUBLISHED|^更新时间")
@@ -133,11 +137,13 @@ def extract_summary(text: str, max_chars: int = 500) -> str:
 
 
 def extract_date_from_text(text: str) -> Optional[str]:
-    """Try to extract a date from text content."""
+    """Try to extract a date from text content, skipping frontmatter."""
+    # Strip frontmatter first
+    text = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.DOTALL)
     patterns = [
-        r"(20\d{2})[年-](0?[1-9]|1[0-2])[月-](0?[1-9]|[12]\d|3[01])",
-        r"(20\d{2})-(0?[1-9]|1[0-2])-(0?[1-9]|[12]\d|3[01])",
-        r"发布于[：:]?\s*(20\d{2}[-/年]\d{1,2}[-/月]\d{1,2})",
+        r"(20\d{2})[-年](0?[1-9]|1[0-2])[-月](0?[1-9]|[12]\d|3[01])",
+        r"20\d{2}-\d{2}-\d{2}",
+        r"发布于[：:]?\s*20\d{2}[-/年]\d{1,2}[-/月]\d{1,2}",
         r"Published?\s*[:\-]?\s*(\w+\s+\d{1,2},?\s+20\d{2})",
     ]
     for pat in patterns:

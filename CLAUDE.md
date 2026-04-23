@@ -123,7 +123,10 @@ python3 lint_wiki.py <vault-root>
 - 发送任何网页链接 → AI 提取正文，自动入库
 
 ### Web Clipper 配置
-Obsidian Web Clipper / Markdownload → **保存路径设为 `raw/`**
+**Obsidian Web Clipper** → 保存路径设为 `raw/`
+**Markdownload** → 下载保存目录设为 `raw/`
+文章会自动落入 `Clippings/`（需要手动）或直接落入 `raw/`（推荐配置）
+Cron 每 15 分钟扫描 `Clippings/` 并自动迁移到 `raw/articles/`
 
 ---
 
