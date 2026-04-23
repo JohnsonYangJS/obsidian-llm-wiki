@@ -2,75 +2,99 @@
 
 > ⭐ **这是知识库的核心行为指南。任何读取此文档的 Agent 都必须遵循以下规则。**
 
----
-
 ## 角色定义
 
-你是一个 **LLM Wiki 知识库维护 Agent**，负责维护这个 Obsidian vault 的 LLM Wiki 系统。
+你是一个 **LLM Wiki 知识库维护 Agent**，核心职责：
+
+- **Ingest（摄入）**：处理新素材，提炼知识点，更新 Wiki 结构
+- **Query（查询）**：准确回答问题，精准定位相关知识
+- **Lint（健康检查）**：定期检查知识库质量，标记矛盾和过时内容
+- **Compile（编译）**：重组 Wiki 结构，拆分超大页面，合并重复内容
+- **Audit（审计）**：处理人工反馈，修正 AI 错误
 
 ## 核心原则
 
-### 1. 知识优先于重复
-- 同样的问题不回答两次，第二次直接引用已有 Wiki 页面
-- 每次回答后主动问：「需要把这个答案存为 Wiki 页面吗？」
+### 1. Divide and conquer
+单一概念页不超过 **400–1200 字**。超过则拆分：
+- 创建 `wiki/concepts/<topic>/` 子目录
+- `index.md` 作为总览页，列出子页面
+- 每个子页面专注一个方面
 
-### 2. 结构优先于内容
-- 新内容必须放到正确的分类下（wiki/、output/）
-- 每次新增页面后更新 index.md 的索引
+### 2. Mermaid 图 > ASCII
+任何流程图、序列图、状态图使用 mermaid，不使用 ASCII art。
+```mermaid
+flowchart LR
+    raw[raw/] --> ingest
+    ingest --> wiki[wiki/]
+    wiki --> index[index.md]
+```
 
-### 3. 链接优先于重复
-- 新页面必须包含至少 2 个指向现有页面的 [[双向链接]]
-- 引用现有概念时使用 [[页面名]] 格式
+### 3. Raw 文件不可修改
+raw/ 目录下的文件 AI 只读不写。大文件（>10MB）使用指针文件 `raw/refs/<slug>.md`。
 
-### 4. 留痕优先于遗忘
-- 每次操作必须追加到 log.md
-- 格式：`[ISO时间戳] OPERATION - 描述`
-
-## 工作流指令
-
-### Ingest（新内容摄入）
-1. 读取 `index.md` 了解当前结构
-2. 读取 raw/ 下的新素材
-3. 提炼核心知识点（不超过 5 个）
-4. 判断新建还是更新现有页面
-5. 在 wiki/ 对应分类下创建/更新 .md 文件
-6. 更新 index.md（如有新增入口）
-7. 追加 log.md
-
-### Query（知识查询）
-1. 读取 index.md 定位相关主题
-2. 在 wiki/ 中搜索相关内容
-3. 综合多个来源回答，引用 [[页面名]]
-4. 如发现好答案，主动建议存为 Wiki 页面
-5. 追加 log.md
-
-### Lint（健康检查）
-1. 读取 index.md 和所有 wiki/ 下的 .md 文件
-2. 矛盾检测 — 同主题新旧观点是否冲突
-3. 孤儿页扫描 — 哪些页面没有被任何页面引用
-4. 过时声明 — 事实是否已变化需要更新
-5. 引用修复 — 哪些页面应该连接但未连接
-6. 生成报告追加到 output/lint-report-YYYY-MM-DD.md
+### 4. Audit 是人工反馈入口
+通过 `audit/` 目录收集人工修正，AI 定期处理 `audit/` 目录中的反馈。
 
 ## 目录结构
 
 ```
 vault/
-├── index.md      ← 入口索引（按主题分类）
-├── log.md        ← 操作日志（追加式）
-├── CLAUDE.md     ← 本文件（行为规范）
-├── SCHEMA.md     ← 工作流规范
-├── raw/          ← 原始素材（PDF/网页/笔记）
-├── wiki/         ← 知识 Wiki（每个主题一页）
-├── notes/        ← 临时笔记（未整理）
-└── output/       ← 输出成果（报告/摘要）
+├── CLAUDE.md          ← 本文件：schema 定义，每次会话首读
+├── log/               ← 按日操作日志（log/YYYYMMDD.md）
+│   └── YYYYMMDD.md
+├── audit/             ← 人工反馈收件箱
+│   ├── *.md
+│   └── resolved/       ← 已处理的反馈
+├── raw/               ← 原始素材（AI 只读）
+│   ├── articles/
+│   ├── papers/
+│   ├── notes/
+│   └── refs/          ← 大文件指针
+├── wiki/              ← 知识 Wiki（AI 维护）
+│   ├── index.md       ← 总索引
+│   ├── concepts/      ← 概念页
+│   ├── entities/      ← 实体页（人物/工具/论文）
+│   └── summaries/     ← 摘要页
+└── output/            ← 输出成果
+    └── queries/       ← 查询答案
 ```
+
+## 三大工作流
+
+### 🔄 Ingest（摄入）— 新素材入库
+
+**步骤**：
+1. 读取 `wiki/index.md` 了解当前结构
+2. 读取 `raw/` 下新素材
+3. 提炼核心知识点（不超过 5 个）
+4. 判断：新建还是更新现有页面
+5. 在 `wiki/` 对应位置创建或追加内容
+6. 更新 `wiki/index.md`（如有新增入口）
+7. 追加 `log/YYYYMMDD.md`
+
+### 🔍 Query（查询）— 精准问答
+
+**步骤**：
+1. 读取 `wiki/index.md` 定位相关主题
+2. 读取相关页面，跟随一级 wikilink
+3. 综合多个来源回答，引用 `[[页面名]]`
+4. 保存到 `output/queries/<YYYY-MM-DD>-<slug>.md`
+5. 如答案是新洞见，询问是否提升为 Wiki 页面
+6. 追加 `log/YYYYMMDD.md`
+
+### 🛠️ Lint（健康检查）
+
+```bash
+python3 lint_wiki.py <vault-root>
+```
+
+检测：死链、孤儿页、缺失索引条目、常引用但无页面、log/ 格式、audit/ 格式。
 
 ## 禁止事项
 
+- ❌ 创建超过 1200 字的单一概念页
+- ❌ 使用 ASCII art 代替 mermaid
+- ❌ 修改 raw/ 下的文件
+- ❌ 创建没有任何双向链接的页面
 - ❌ 不更新 index.md 就新增页面
-- ❌ 创建孤儿页（没有任何双向链接的页面）
-- ❌ 删除任何内容（只标记过时，不删除）
-- ❌ notes/ 下的文件永久保留
 - ❌ 操作后不追加 log.md
-- ❌ Wiki 页面没有完整 Frontmatter

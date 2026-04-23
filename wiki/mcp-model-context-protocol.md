@@ -3,7 +3,7 @@ title: MCP 模型上下文协议
 tags: [mcp, openclaw, tool-integration, ai-agent]
 created: 2026-04-23
 updated: 2026-04-23
-related: [[OpenClaw 指南]], [[Skills 系统]], [[LLM Wiki 模式]], [[Claude Code 指南]]
+related: [[openclaw-guide|OpenClaw 指南]], [[skills-system|Skills 系统]], [[llm-wiki-pattern|LLM Wiki 模式]], [[claude-code-guide|Claude Code 指南]]
 sources: []
 ---
 
@@ -36,6 +36,6 @@ Skills 是 OpenClaw 对 MCP 的实现方式，两者本质相同：
 - **MCP** = 更通用的标准协议名称
 
 ## 相关链接
-- [[OpenClaw 指南]]
-- [[Skills 系统]]
-- [[Claude Code 指南]]
+- [[openclaw-guide|OpenClaw 指南]]
+- [[skills-system|Skills 系统]]
+- [[claude-code-guide|Claude Code 指南]]

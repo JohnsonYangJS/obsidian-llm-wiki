@@ -3,7 +3,7 @@ title: Harness 工程
 tags: [harness, engineering, ai-toolchain, development]
 created: 2026-04-23
 updated: 2026-04-23
-related: [[Claude Code 指南]], [[Skills 系统]], [[OpenClaw 指南]], [[LLM Wiki 模式]]
+related: [[claude-code-guide|Claude Code 指南]], [[skills-system|Skills 系统]], [[openclaw-guide|OpenClaw 指南]], [[llm-wiki-pattern|LLM Wiki 模式]]
 sources: []
 ---
 
@@ -43,6 +43,6 @@ OpenClaw 的 Skills 系统是 Harness 工程的典型实现：
 - 支持多渠道触发
 
 ## 相关链接
-- [[OpenClaw 指南]]
-- [[Skills 系统]]
-- [[Claude Code 指南]]
+- [[openclaw-guide|OpenClaw 指南]]
+- [[skills-system|Skills 系统]]
+- [[claude-code-guide|Claude Code 指南]]

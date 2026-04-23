@@ -3,7 +3,7 @@ title: OpenClaw vs Claude Code
 tags: [comparison, claude-code, openclaw, ai-agent, tools]
 created: 2026-04-23
 updated: 2026-04-23
-related: [[OpenClaw 指南]], [[Claude Code 指南]], [[Skills 系统]], [[Hermes Agent]]
+related: [[openclaw-guide|OpenClaw 指南]], [[claude-code-guide|Claude Code 指南]], [[skills-system|Skills 系统]], [[hermes-agent|Hermes Agent]]
 sources: []
 ---
 
@@ -56,6 +56,6 @@ OpenClaw（战略层）          Claude Code（战术层）
 - **复杂项目** → OpenClaw 协调 + Claude Code 执行
 
 ## 相关链接
-- [[OpenClaw 指南]]
-- [[Claude Code 指南]]
-- [[Hermes Agent]]
+- [[openclaw-guide|OpenClaw 指南]]
+- [[claude-code-guide|Claude Code 指南]]
+- [[hermes-agent|Hermes Agent]]

@@ -3,7 +3,7 @@ title: 第二大脑
 tags: [second-brain, knowledge-management, productivity, ai]
 created: 2026-04-23
 updated: 2026-04-23
-related: [[LLM Wiki 模式]], [[Obsidian AI 指南]], [[OpenClaw 指南]], [[Hermes Agent]]
+related: [[llm-wiki-pattern|LLM Wiki 模式]], [[obsidian-ai-guide|Obsidian AI 指南]], [[openclaw-guide|OpenClaw 指南]], [[hermes-agent|Hermes Agent]]
 sources: []
 ---
 
@@ -38,6 +38,6 @@ LLM Wiki 模式是第二大脑的 AI 进化版：
 - 第二大脑是静态存档 → LLM Wiki 是会"自己生长"的生命体
 
 ## 相关链接
-- [[LLM Wiki 模式]]
-- [[Obsidian AI 指南]]
-- [[Hermes Agent]]
+- [[llm-wiki-pattern|LLM Wiki 模式]]
+- [[obsidian-ai-guide|Obsidian AI 指南]]
+- [[hermes-agent|Hermes Agent]]

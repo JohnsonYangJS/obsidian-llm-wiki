@@ -19,7 +19,7 @@ related: [[llm-wiki-pattern]], [[second-brain]], [[claude-code-guide]]
 
 ## 核心功能
 
-### 双向链接 `[[页面名]]`
+### 双向链接 ``
 明确标注页面间关系，构建知识网络。
 
 ### 图谱视图

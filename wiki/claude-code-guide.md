@@ -1,61 +1,34 @@
 ---
 title: Claude Code 指南
-tags: [claude-code, ai-tool, coding]
+tags: [claude-code, ai-agent, coding, openclaw]
 created: 2026-04-23
 updated: 2026-04-23
-related: [[hermes-agent]], [[openclaw-guide]], [[mcp-protocol]], [[harness-engineering]]
+related: [[openclaw-vs-claude-code]], [[hermes-agent]], [[mcp-model-context-protocol]]
+sources: [raw/Claude-Code-Complete-Guide-zh-v260411.pdf]
 ---
 
 # Claude Code 指南
 
+> AI 编程工具，终端 Agent 代表作，通过自然语言指令完成代码编写、调试和重构。
+
 ## 概述
-Anthropic 官方 AI 编程工具，通过自然语言在终端直接操控代码库。是终端 Agent 的代表作，GitHub Star 增速历史第一。
+Claude Code 是 Anthropic 推出的 CLI 编程 Agent，深度集成 Claude 模型。用户在终端通过自然语言与 AI 交互，AI 可以读写文件系统、执行命令、重构代码。是 LLM Wiki 模式中"战术层"的代表工具。
 
-## 核心能力
+## 核心功能
 
-### 安装与配置
-- 官方安装：`curl -fsSL https://claude.ai/install.sh | bash`
-- Homebrew：`brew install --cask claude`
-- 登录：`claude auth`
-- 首次配置后写入 `~/.claude/settings.json`
+- **代码编写**：根据描述生成完整代码文件
+- **代码调试**：理解错误信息，定位并修复问题
+- **代码重构**：改善代码结构，不改变功能
+- **终端执行**：直接运行命令，实时获取反馈
+- **上下文理解**：支持超长上下文（200K），理解大型代码库
 
-### 工作模式
-| 模式 | 说明 | 适合场景 |
-|------|------|----------|
-| Plan Mode | 先规划再执行 | 复杂任务 |
-| Auto Mode | 直接执行 | 简单任务 |
-| `--dangerously-skip-permissions` | 跳过权限确认 | 自动化脚本 |
+## 架构特点
 
-### 核心文件
-- `CLAUDE.md` — 项目记忆文件，放在根目录
-- `.claude/` — 缓存、记忆、命令目录
-- `~/.claude/settings.json` — 全局配置
+- 基于 MCP（Model Context Protocol）连接外部工具
+- 支持 filesystem、grep、bash 等内置工具
+- 可通过 Skills 扩展更多能力
 
-### Skills 系统
-Skills 是一组规范，告诉 Claude 如何执行特定任务。放在 `~/.claude/skills/` 目录下。
-
-### 多 Agent 协作
-- `claude --worktree <name>` — 创建独立工作区
-- Subagent — 子进程并行执行
-- git worktree — 隔离并行开发
-
-### 工具生态
-- MCP（Model Context Protocol）— 连接外部服务
-- Hooks — 拦截操作的自动化脚本
-- 插件市场 — 社区贡献的扩展
-
-## 进阶技巧
-- Pipe 数据：`cat error.log | claude`
-- 引用网页：`claude < https://example.com`
-- `/compact` — 压缩上下文
-- `/browse` — 浏览器操作
-- `/project` — 切换项目
-
-## 参考来源
-- raw/Claude-Code-Complete-Guide-zh-v260411.txt
-- raw/Claude-Code-The-Complete-Guide-v260411.txt
-
-## 相关
-- [[hermes-agent]] — 自改进 Agent
-- [[openclaw-guide]] — 多渠道 Agent
-- [[harness-engineering]] — 工具链设计
+## 相关链接
+- [[openclaw-vs-claude-code|OpenClaw vs Claude Code]] — 两者定位对比
+- [[hermes-agent|Hermes Agent]] — 另一个自改进 Agent
+- [[mcp-model-context-protocol|MCP 模型上下文协议]] — 连接 AI 与工具的标准协议

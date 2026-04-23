@@ -3,7 +3,7 @@ title: Skills 系统
 tags: [skills, openclaw, mcp, extensibility, ai-agent]
 created: 2026-04-23
 updated: 2026-04-23
-related: [[OpenClaw 指南]], [[MCP 模型上下文协议]], [[LLM Wiki 模式]], [[Harness 工程]]
+related: [[openclaw-guide|OpenClaw 指南]], [[mcp-model-context-protocol|MCP 模型上下文协议]], [[llm-wiki-pattern|LLM Wiki 模式]], [[harness-engineering|Harness 工程]]
 sources: []
 ---
 
@@ -34,6 +34,6 @@ Skills 是 OpenClaw 的核心扩展系统，每个 Skill 是一个包含指令�
 | `trading-signal` | 链上聪明钱信号 |
 
 ## 相关链接
-- [[OpenClaw 指南]]
-- [[MCP 模型上下文协议]]
-- [[LLM Wiki 模式]]
+- [[openclaw-guide|OpenClaw 指南]]
+- [[mcp-model-context-protocol|MCP 模型上下文协议]]
+- [[llm-wiki-pattern|LLM Wiki 模式]]
