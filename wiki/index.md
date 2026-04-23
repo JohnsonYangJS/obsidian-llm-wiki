@@ -44,3 +44,16 @@
 | Obsidian | 如何搭配合 AI 使用？最佳目录结构是什么？ |
 | LLM Wiki | 三层架构怎么设计？Ingest/Query/Lint 怎么做？ |
 | Polymarket | 是什么？怎么参与？有哪些策略？ |
+
+- [[summaries/hermes-agent-the-complete-guide-v260407|Hermes Agent The Complete Guide v260407]] — 2026-04-23
+- [[summaries/polymarket-complete-guide-zh-v200|Polymarket Complete Guide zh v2.0.0]] — 2026-04-23
+- [[summaries/claude-code-the-complete-guide-v260411|Claude Code The Complete Guide v260411]] — 2026-04-23
+- [[summaries/openclaw-the-complete-guide-v260411|OpenClaw The Complete Guide v260411]] — 2026-04-23
+- [[summaries/obsidian-ai-v100|Obsidian AI v1.0.0]] — 2026-04-23
+- [[summaries/openclaw-complete-guide-zh-v140|OpenClaw Complete Guide zh v1.4.0]] — 2026-04-23
+- [[summaries/hermes-agent-从入门到精通-v260407|Hermes Agent 从入门到精通 v260407]] — 2026-04-23
+- [[summaries/polymarket-the-complete-guide-v260411|Polymarket The Complete Guide v260411]] — 2026-04-23
+- [[summaries/claude-code-complete-guide-zh-v260411|Claude Code Complete Guide zh v260411]] — 2026-04-23
+- [[summaries/claude-code-source-code-analysis-v260411|Claude Code Source Code Analysis v260411]] — 2026-04-23
+- [[summaries/obsidian-ai-the-complete-guide-v100|Obsidian AI The Complete Guide v1.0.0]] — 2026-04-23
+- [[summaries/claude-code-source-analysis-zh-v260411|Claude Code Source Analysis zh v260411]] — 2026-04-23
