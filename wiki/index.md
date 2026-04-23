@@ -57,3 +57,6 @@
 - [[summaries/claude-code-source-code-analysis-v260411|Claude Code Source Code Analysis v260411]] — 2026-04-23
 - [[summaries/obsidian-ai-the-complete-guide-v100|Obsidian AI The Complete Guide v1.0.0]] — 2026-04-23
 - [[summaries/claude-code-source-analysis-zh-v260411|Claude Code Source Analysis zh v260411]] — 2026-04-23
+- [[summaries/赖翔-llm-wiki模式|赖翔 LLM Wiki模式]] — 2026-04-23
+- [[summaries/graphifykarpathy-知识库工作流的终极进化|GraphifyKarpathy 知识库工作流的终极进化]] — 2026-04-23
+- [[summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了|我用OpenClaw，把flomo、Obsidian、Get笔记和ima知识库串起来了！]] — 2026-04-23
