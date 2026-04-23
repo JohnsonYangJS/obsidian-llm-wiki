@@ -60,3 +60,5 @@
 - [[summaries/赖翔-llm-wiki模式|赖翔 LLM Wiki模式]] — 2026-04-23
 - [[summaries/graphifykarpathy-知识库工作流的终极进化|GraphifyKarpathy 知识库工作流的终极进化]] — 2026-04-23
 - [[summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了|我用OpenClaw，把flomo、Obsidian、Get笔记和ima知识库串起来了！]] — 2026-04-23
+- [[summaries/我用openclaw搭了个个人知识管理神器自动同步get笔记到obsidian双向链接自动生成效率直接拉满|我用OpenClaw搭了个个人知识管理神器：自动同步Get笔记到Obsidian，双向链接自动生成，效率直接拉满]] — 2026-04-23
+- [[summaries/全网爆火的大模型ai知识库保姆级教程来了|全网爆火的大模型AI知识库，保姆级教程来了]] — 2026-04-23
