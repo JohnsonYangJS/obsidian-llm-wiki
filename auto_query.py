@@ -11,12 +11,28 @@ MANIFEST_PATH = VAULT_ROOT / ".query-manifest.json"
 
 
 def extract_json(raw: str) -> dict:
-    """Try multiple strategies to extract JSON from raw LLM response."""
-    # Strategy 1: find first { and balance braces
-    for start in [raw.find("{"), raw.find("｛")]:
+    """Try multiple strategies to extract JSON from raw LLM response.
+    
+    Handles two formats:
+    - Case A: clean JSON (no thinking) → find { and balance braces
+    - Case B: with thinking tag like ` Christensen... Christensen` (fullwidth Japanese quotes)
+      → extract from after the LAST ` Christensen` marker
+    """
+    text = raw.strip()
+    
+    # Case B: strip thinking tag — ` Christensen... Christensen`
+    # Find the LAST occurrence of ` Christensen` (with leading space + fullwidth opening quote `「`)
+    thinking_marker = " Christensen"
+    last_marker_pos = text.rfind(thinking_marker)
+    if last_marker_pos != -1:
+        # Extract everything after the last ` Christensen` marker
+        text = text[last_marker_pos + len(thinking_marker):].lstrip()
+    
+    # Case A: find first { and balance braces
+    for start in [text.find("{"), text.find("｛")]:
         if start == -1:
             continue
-        json_str = raw[start:]
+        json_str = text[start:]
         count = 0
         end_pos = 0
         for i, c in enumerate(json_str):
@@ -32,7 +48,7 @@ def extract_json(raw: str) -> dict:
                 return json.loads(json_str[:end_pos])
             except json.JSONDecodeError:
                 pass
-    raise ValueError(f"No parseable JSON found in: {repr(raw[:100])}")
+    raise ValueError(f"No parseable JSON found in: {repr(raw[:200])}")
 
 
 def llm_generate(text: str) -> dict:
@@ -207,6 +223,13 @@ def main():
                 continue
             try:
                 result = llm_generate(f"问题：{q}\n\n回答：{a}")
+                # Skip placeholder responses
+                title = result.get("title", "")
+                summary = result.get("summary", "")
+                if not summary or title in ("...", "适合做页面标题的一句话（不超过30字）", "untitled"):
+                    print(f"  SKIP (placeholder): title={repr(title)}")
+                    manifest[key] = True
+                    continue
                 out_dir = VAULT_ROOT / "wiki" / "queries"
                 out_dir.mkdir(parents=True, exist_ok=True)
                 filename = write_wiki_page(result["title"], result["summary"],
