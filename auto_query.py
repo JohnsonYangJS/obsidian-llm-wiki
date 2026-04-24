@@ -18,8 +18,7 @@ import json
 import os
 import re
 import sys
-import urllib.request
-import urllib.error
+import requests
 from pathlib import Path
 
 # ── MiniMax LLM ───────────────────────────────────────────────────────────
@@ -62,7 +61,6 @@ SESSIONS_DIR = Path.home() / ".openclaw/agents/main/sessions"
 def get_substantive_msgs(filepath: Path, min_len: int = 80) -> list[dict]:
     """从 session 文件提取有实质内容的 user→assistant 消息。"""
     messages = []
-    skip_prefixes = ("Cron:", "HEARTBEAT", "Heartbeat", "System:", "无新文件", "Watch")
     try:
         with open(filepath) as f:
             for line in f:
@@ -79,27 +77,40 @@ def get_substantive_msgs(filepath: Path, min_len: int = 80) -> list[dict]:
                     )
                 else:
                     text = str(content)
-                if role in ("user", "assistant") and len(text) >= min_len:
-                    if not text[:50].startswith(skip_prefixes):
-                        messages.append({"role": role, "text": text})
+                if role == "assistant" and len(text) >= min_len:
+                    # Always keep assistant responses (they contain the actual answers)
+                    # Skip image-only messages
+                    extra_skip = ("[media attached", "To send an image", "MEDIA:", "/Users/txyjs/.openclaw/media/")
+                    if role == "user" and any(k in text[:100] for k in extra_skip):
+                        continue
+                    messages.append({"role": role, "text": text})
+                elif role == "user" and len(text) >= min_len:
+                    # Skip system/cron/heartbeat/auto-reply user messages
+                    skip_keywords = ("Cron:", "HEARTBEAT", "Heartbeat:", "System:",
+                                     "无新文件", "Watch", "[[reply_to", "[cron",
+                                     "无待处理", "本次运行", "入库结果")
+                    if any(k in text[:200] for k in skip_keywords):
+                        continue
+                    # Skip image-only messages
+                    extra_skip = ("[media attached", "To send an image", "MEDIA:", "/Users/txyjs/.openclaw/media/")
+                    if role == "user" and any(k in text[:100] for k in extra_skip):
+                        continue
+                    messages.append({"role": role, "text": text})
     except (json.JSONDecodeError, OSError):
         pass
     return messages
 
 
 def extract_qa_pairs(messages: list[dict]) -> list[dict]:
-    """从消息流中提取 user→assistant Q&A 对。"""
+    """从消息流中提取 user→assistant Q&A 对。assistant 回复需要前一条是 user 消息。"""
     pairs = []
     i = 0
     while i < len(messages) - 1:
-        if messages[i]['role'] == 'user' and len(messages[i]['text']) > 15:
-            for j in range(i + 1, min(i + 4, len(messages))):
-                if messages[j]['role'] == 'assistant' and len(messages[j]['text']) > 60:
-                    q = messages[i]['text'][:500]
-                    a = messages[j]['text'][:2000]
-                    if not any(k in q for k in ['Cron:', 'Heartbeat', 'HEARTBEAT', 'System:', '无新文件', 'Watch', '[[reply_to']):
-                        pairs.append({'question': q, 'answer': a})
-                    break
+        if messages[i]['role'] == 'user' and messages[i+1]['role'] == 'assistant':
+            q = messages[i]['text'][:500]
+            a = messages[i+1]['text'][:2000]
+            if len(a) > 80:
+                pairs.append({'question': q, 'answer': a})
         i += 1
     return pairs
 
