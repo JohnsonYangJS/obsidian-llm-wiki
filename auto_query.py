@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-"""
-auto_query.py — 定时将 session 历史中有价值的问答写入 wiki。
-"""
-import argparse, datetime as _dt, json, os, re, subprocess, sys
+"""auto_query.py — 定时将 session 历史中有价值的问答写入 wiki。"""
+import argparse, datetime as _dt, json, os, re, subprocess, sys, time
 from pathlib import Path
 
 MINIMAX_API_KEY = "sk-cp-SUjytMlOmz-9qX73aXQbhNog3hEQmYoLxVff1IkOVFCJ_pia4t0ykTJSgp3bQ3aWvmIyIu-HJvNRCZEXHRTL_rFGARGtSpURNHNunmm5yXTucUaLJDH1uaE"
@@ -12,52 +10,66 @@ VAULT_ROOT = Path("/Users/txyjs/Documents/Obsidian Vault")
 MANIFEST_PATH = VAULT_ROOT / ".query-manifest.json"
 
 
+def extract_json(raw: str) -> dict:
+    """Try multiple strategies to extract JSON from raw LLM response."""
+    # Strategy 1: find first { and balance braces
+    for start in [raw.find("{"), raw.find("｛")]:
+        if start == -1:
+            continue
+        json_str = raw[start:]
+        count = 0
+        end_pos = 0
+        for i, c in enumerate(json_str):
+            if c in "{[":
+                count += 1
+            elif c in "}]":
+                count -= 1
+            if count == 0:
+                end_pos = i + 1
+                break
+        if end_pos > 0:
+            try:
+                return json.loads(json_str[:end_pos])
+            except json.JSONDecodeError:
+                pass
+    raise ValueError(f"No parseable JSON found in: {repr(raw[:100])}")
+
+
 def llm_generate(text: str) -> dict:
-    """Call MiniMax LLM to generate summary+title+concepts from Q&A text."""
-    prompt = f"""你是一个知识库整理助手。请根据以下问答内容，生成一段中文摘要。
-问答内容：
-{text}
-请输出 JSON 格式（只输出 JSON，不要其他内容）：
-{{"summary": "100-200字中文摘要", "title": "适合做页面标题的一句话（不超过30字）", "concepts": ["概念1", "概念2", "概念3"]}}"""
+    prompt = (
+        "你是一个知识库整理助手。请根据以下问答内容，生成一段中文摘要。\n"
+        f"问答内容：\n{text}\n"
+        "请直接输出 JSON，包含三个字段：summary（100-200字中文摘要）、title（不超过30字的中文标题）、concepts（包含3个概念的列表）。只输出 JSON，不要其他内容。"
+    )
     payload = json.dumps({
         "model": "MiniMax-M2.7-highspeed",
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 600,
-        "temperature": 0.3,
+        "max_tokens": 300,
+        "temperature": 0.1,
     })
-    proc = subprocess.run(
-        ["curl", "-s", "-X", "POST", f"{MINIMAX_BASE}/chat/completions",
-         "-H", f"Authorization: Bearer {MINIMAX_API_KEY}",
-         "-H", "Content-Type: application/json",
-         "-d", payload, "--noproxy", "*", "--max-time", "30"],
-        capture_output=True, text=True, timeout=35,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(f"curl rc={proc.returncode}: {proc.stderr}")
-    result = json.loads(proc.stdout)
-    raw = result["choices"][0]["message"]["content"]
 
-    # Find first { and extract balanced JSON
-    start = raw.find("{")
-    if start == -1:
-        raise ValueError(f"No JSON found in response: {repr(raw[:100])}")
-    json_str = raw[start:]
-    count = 0
-    end_pos = 0
-    for i, c in enumerate(json_str):
-        if c in "{[":
-            count += 1
-        elif c in "}]":
-            count -= 1
-        if count == 0:
-            end_pos = i + 1
-            break
-    if end_pos == 0:
-        raise ValueError(f"Unbalanced braces in: {repr(raw[start:start+80])}")
-    return json.loads(json_str[:end_pos])
+    for attempt in range(3):
+        proc = subprocess.run(
+            ["curl", "-s", "-X", "POST", f"{MINIMAX_BASE}/chat/completions",
+             "-H", f"Authorization: Bearer {MINIMAX_API_KEY}",
+             "-H", "Content-Type: application/json",
+             "-d", payload, "--noproxy", "*", "--max-time", "30"],
+            capture_output=True, text=True, timeout=35,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"curl rc={proc.returncode}: {proc.stderr}")
+        raw = json.loads(proc.stdout)["choices"][0]["message"]["content"]
+        try:
+            return extract_json(raw)
+        except ValueError:
+            if attempt < 2:
+                time.sleep(1)
+                continue
+            raise
 
 
 def get_substantive_msgs(filepath: Path, min_len: int = 80) -> list:
+    """从 session JSONL 提取 user/assistant 消息（新版格式）。"""
     messages = []
     try:
         with open(filepath) as f:
@@ -66,11 +78,32 @@ def get_substantive_msgs(filepath: Path, min_len: int = 80) -> list:
                     msg = json.loads(line.strip())
                 except (json.JSONDecodeError, ValueError):
                     continue
-                role = msg.get("role", "")
-                content = msg.get("content", "") or ""
-                if isinstance(content, list):
-                    content = " ".join(c.get("text", "") for c in content if isinstance(c, dict))
-                if role in ("user", "assistant") and len(content) >= min_len:
+                # 新版格式: role/content 在 msg["message"] 里
+                inner = msg.get("message", {})
+                if not inner:
+                    continue
+                role = inner.get("role", "")
+                if role not in ("user", "assistant"):
+                    continue
+                raw_content = inner.get("content", "") or ""
+                # content 可能是 JSON 字符串列表
+                if isinstance(raw_content, str):
+                    try:
+                        blocks = json.loads(raw_content)
+                    except (json.JSONDecodeError, ValueError):
+                        blocks = [{"type": "text", "text": raw_content}]
+                elif isinstance(raw_content, list):
+                    blocks = raw_content
+                else:
+                    blocks = []
+                content = " ".join(
+                    b.get("text", "") for b in blocks
+                    if isinstance(b, dict) and b.get("type") == "text" and b.get("text")
+                )
+                # Skip system/Cron/heartbeat messages
+                if content.startswith("System:") or content.startswith("[cron:") or                    content.startswith("[media attached:") or                    content.startswith("HEARTBEAT"):
+                    continue
+                if len(content) >= min_len:
                     messages.append({"role": role, "content": content})
     except Exception:
         pass
@@ -150,9 +183,14 @@ generation: LLM (MiniMax)
 
 
 def main():
-    args = argparse.ArgumentParser().parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    args = parser.parse_args()
+
     cutoff = _dt.datetime.now() - _dt.timedelta(hours=48)
-    recent_files = [f for f in SESSIONS_DIR.iterdir() if f.is_file() and f.stat().st_mtime > cutoff.timestamp()]
+    recent_files = [f for f in SESSIONS_DIR.iterdir()
+                    if f.is_file() and f.stat().st_mtime > cutoff.timestamp()]
     print(f"Found {len(recent_files)} recent session files")
     manifest = load_manifest()
     written = 0
@@ -163,11 +201,16 @@ def main():
             key = f"{filepath.stem}:{hash(q) % 100000}"
             if key in manifest:
                 continue
+            if args.dry_run:
+                print(f"  [dry-run] would process: {q[:50]}...")
+                manifest[key] = True
+                continue
             try:
                 result = llm_generate(f"问题：{q}\n\n回答：{a}")
                 out_dir = VAULT_ROOT / "wiki" / "queries"
                 out_dir.mkdir(parents=True, exist_ok=True)
-                filename = write_wiki_page(result["title"], result["summary"], result.get("concepts", []), [(q, a)], out_dir)
+                filename = write_wiki_page(result["title"], result["summary"],
+                                        result.get("concepts", []), [(q, a)], out_dir)
                 manifest[key] = {"title": result["title"], "file": filename}
                 written += 1
                 print(f"  Wrote: {filename}")
