@@ -2,11 +2,12 @@
 """
 ingest_inbound.py — 多渠道内容入库脚本
 
-支持 4 个渠道：
+支持 5 个渠道：
   1. 飞书文件下载        --channel feishu [--chat-id ID] [--since MINUTES]
   2. 飞书云文档抓取       --channel feishu-doc --url URL
   3. URL 内容抓取         --channel url --url URL [--title TITLE]
   4. raw/ 目录监控       --channel watcher [--watch-dir DIR]
+  5. 邮件入库            --channel email --account --folder --password
 
 Usage:
   python3 ingest_inbound.py --channel feishu --chat-id oc_xxx
@@ -517,17 +518,239 @@ def channel_watcher(watch_dir: str = None, dry_run: bool = False):
     return new_files
 
 
+# ── Channel 5: 邮件入库 ────────────────────────────────────────────────────
+
+def channel_email(account: str, password: str, folder: str = "AI",
+                  senders: list = None, subject_keywords: list = None,
+                  dry_run: bool = False):
+    """
+    从 IMAP 邮箱抓取 AI 摘要邮件，写入 raw/
+    """
+    import email, email.header, imaplib, re
+    from html import parser as html_parser
+
+    if senders is None:
+        senders = ["Superlinear Academy", "Team Memo"]
+    if subject_keywords is None:
+        subject_keywords = []
+
+    log(f"📧 邮件入库: {account} / {folder}")
+
+    # ── HTML 提取器 ────────────────────────────────────────────────────────
+    class HTMLTextExtractor(html_parser.HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.text_parts = []
+            self.skip_tags = {'script', 'style', 'head', 'meta', 'link'}
+            self.in_skip = False
+
+        def handle_starttag(self, tag, attrs):
+            if tag in self.skip_tags:
+                self.in_skip = True
+        def handle_endtag(self, tag):
+            if tag in self.skip_tags:
+                self.in_skip = False
+            if tag == 'br':
+                self.text_parts.append('\n')
+            if tag == 'p':
+                self.text_parts.append('\n\n')
+        def handle_data(self, data):
+            if not self.in_skip:
+                self.text_parts.append(data)
+        def get_text(self):
+            return re.sub(r'\n{3,}', '\n\n', "".join(self.text_parts)).strip()
+
+    def decode_header_value(value):
+        parts = email.header.decode_header(value)
+        result = []
+        for part, charset in parts:
+            if isinstance(part, bytes):
+                result.append(part.decode(charset or "utf-8", errors="replace"))
+            else:
+                result.append(part)
+        return "".join(result)
+
+    def extract_body(msg) -> str:
+        body_text, body_html = None, None
+        if msg.is_multipart():
+            for part in msg.walk():
+                ct = part.get_content_type()
+                cd = part.get_contentDisposition()
+                if cd and "attachment" in cd:
+                    continue
+                charset = part.get_content_charset() or "utf-8"
+                payload = part.get_payload(decode=True)
+                if not payload:
+                    continue
+                text = payload.decode(charset, errors="replace")
+                if ct == "text/plain" and body_text is None:
+                    body_text = text
+                elif ct == "text/html" and body_html is None:
+                    body_html = text
+        else:
+            charset = msg.get_content_charset() or "utf-8"
+            payload = msg.get_payload(decode=True)
+            if payload:
+                text = payload.decode(charset, errors="replace")
+                if msg.get_content_type() == "text/html":
+                    body_html = text
+                else:
+                    body_text = text
+        if body_text:
+            return body_text.strip()
+        elif body_html:
+            ex = HTMLTextExtractor()
+            ex.feed(body_html)
+            return ex.get_text()
+        return ""
+
+    # ── IMAP 连接 ──────────────────────────────────────────────────────────
+    domain = account.split("@")[-1].lower()
+    if "outlook" in domain or "hotmail" in domain or "live" in domain:
+        server, port = "outlook.office365.com", 993
+    elif "gmail" in domain:
+        server, port = "imap.gmail.com", 993
+    else:
+        server, port = "outlook.office365.com", 993
+
+    try:
+        mail = imaplib.IMAP4_SSL(server, port)
+        mail.login(account, password)
+        log(f"✅ 登录成功: {account}")
+    except Exception as e:
+        log(f"❌ IMAP 登录失败: {e}")
+        return []
+
+    try:
+        status, _ = mail.select(f'"{folder}"')
+        if status != "OK":
+            status, _ = mail.select("INBOX")
+            if status != "OK":
+                log("❌ 无法打开文件夹")
+                mail.logout()
+                return []
+            log(f"文件夹 '{folder}' 不存在，已切换到 INBOX")
+    except Exception as e:
+        log(f"❌ 选择文件夹失败: {e}")
+        mail.logout()
+        return []
+
+    status, messages = mail.search(None, "ALL")
+    if status != "OK":
+        log("❌ 搜索失败")
+        mail.logout()
+        return []
+
+    email_ids = messages[0].split()
+    if not email_ids:
+        log("📭 文件夹为空")
+        mail.logout()
+        return []
+
+    manifest = load_manifest()
+    new_count = 0
+
+    for eid in email_ids:
+        try:
+            status, raw = mail.fetch(eid, "(RFC822)")
+            if status != "OK" or not raw:
+                continue
+            msg = email.message_from_bytes(raw[0][1])
+            subject = decode_header_value(msg.get("Subject", ""))
+            sender = decode_header_value(msg.get("From", ""))
+            msg_id = msg.get("Message-ID", "") or str(eid)
+            key = f"{account}:{msg_id}"
+
+            if key in manifest.get("emails", {}):
+                continue
+
+            sender_match = any(s.lower() in sender.lower() for s in senders)
+            subject_match = any(kw.lower() in subject.lower() for kw in subject_keywords)
+            if not (sender_match or subject_match):
+                continue
+
+            log(f"  ✅ 匹配: {subject[:50]}")
+
+            if dry_run:
+                new_count += 1
+                continue
+
+            body = extract_body(msg)
+            if not body:
+                log(f"  ⚠️ 正文为空: {subject[:30]}")
+                continue
+
+            date_str = datetime.now().strftime("%Y%m%d")
+            safe_subject = re.sub(r"[^\w\s-]", "", subject)
+            safe_subject = re.sub(r"[\s_]+", "-", safe_subject).strip("-").lower()[:30]
+            filename = f"email-{date_str}-{safe_subject}.txt"
+            filepath = RAW_DIR / filename
+            counter = 1
+            while filepath.exists():
+                filename = f"email-{date_str}-{safe_subject}-{counter}.txt"
+                filepath = RAW_DIR / filename
+                counter += 1
+
+            content = f"""# {subject}
+
+> **发件人:** {sender}
+> **收件时间:** {msg.get("Date", "Unknown")}
+> **邮件ID:** {key}
+
+---
+
+{body}
+"""
+            filepath.write_text(content, encoding="utf-8")
+            log(f"  📄 已保存: {filename}")
+
+            if "emails" not in manifest:
+                manifest["emails"] = {}
+            manifest["emails"][key] = {
+                "subject": subject, "sender": sender,
+                "filename": filename, "saved_at": datetime.now().isoformat(),
+            }
+            new_count += 1
+
+        except Exception as e:
+            log(f"  ⚠️ 处理失败: {e}")
+            continue
+
+    manifest["last_run"] = datetime.now().isoformat()
+    save_manifest(manifest)
+    mail.logout()
+
+    if dry_run:
+        log(f"🔍 干跑: 匹配到 {new_count} 封新邮件")
+    else:
+        log(f"✅ 入库完成: {new_count} 封新邮件 → raw/")
+        append_log(f"邮件入库 {new_count} 封")
+
+    # 触发 auto_ingest
+    if new_count > 0 and not dry_run:
+        subprocess.Popen(
+            [sys.executable, str(VAULT_ROOT / "auto_ingest.py"), str(VAULT_ROOT)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+
+    return new_count
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="多渠道内容入库")
-    parser.add_argument("--channel", choices=["feishu", "feishu-doc", "url", "watcher"],
+    parser.add_argument("--channel", choices=["feishu", "feishu-doc", "url", "watcher", "email"],
                         required=True, help="入库渠道")
     parser.add_argument("--chat-id", help="飞书 chat_id (feishu 渠道)")
     parser.add_argument("--since", type=int, default=30, help="回查分钟数 (feishu 渠道)")
     parser.add_argument("--url", help="目标 URL (feishu-doc / url 渠道)")
     parser.add_argument("--title", help="文章标题 (url 渠道)")
     parser.add_argument("--watch-dir", help="监控目录 (watcher 渠道)")
+    parser.add_argument("--account", help="邮箱地址 (email 渠道)")
+    parser.add_argument("--password", help="邮箱密码或 App Password (email 渠道)")
+    parser.add_argument("--folder", default="AI", help="邮件文件夹 (email 渠道，默认: AI)")
+    parser.add_argument("--senders", nargs="+", help="匹配发件人 (email 渠道)")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -545,6 +768,15 @@ def main():
         channel_url(args.url, title=args.title, dry_run=args.dry_run)
     elif args.channel == "watcher":
         channel_watcher(watch_dir=args.watch_dir, dry_run=args.dry_run)
+    elif args.channel == "email":
+        if not args.account or not args.password:
+            print("ERROR: --account and --password required for email channel", file=sys.stderr)
+            sys.exit(2)
+        channel_email(
+            account=args.account, password=args.password,
+            folder=args.folder, senders=args.senders or None,
+            dry_run=args.dry_run,
+        )
 
 
 if __name__ == "__main__":
