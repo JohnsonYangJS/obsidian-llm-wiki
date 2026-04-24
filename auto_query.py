@@ -68,9 +68,9 @@ def llm_generate(text: str) -> dict:
         "请直接输出 JSON，包含三个字段：summary（100-200字中文摘要）、title（不超过30字的中文标题）、concepts（包含3个概念的列表）。只输出 JSON，不要其他内容。"
     )
     payload = json.dumps({
-        "model": "MiniMax-M2.5",
+        "model": "MiniMax-M2.7-highspeed",
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 300,
+        "max_tokens": 1200,
         "temperature": 0.1,
     })
 
