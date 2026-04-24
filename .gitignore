@@ -1,6 +1,26 @@
-node_modules/
+# === Obsidian ===
 .obsidian/
 
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+
+# === Large binaries (not suitable for git) ===
 raw/*.pdf
 raw/*.txt
-# raw/assets/ is allowed (small reference images)
+raw/*.md
+!raw/assets/
+output/*.pptx
+output/*.pdf
+output/wiki-graph.html
+output/benchmark_report.md
+output/queries/
+
+# === Logs / cache ===
+audit/resolved/
+log/
+graphify-out/
+
+# === OS ===
+.DS_Store
