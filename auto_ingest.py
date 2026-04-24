@@ -31,29 +31,27 @@ MINIMAX_API_KEY = "sk-cp-SUjytMlOmz-9qX73aXQbhNog3hEQmYoLxVff1IkOVFCJ_pia4t0ykTJ
 MINIMAX_BASE = "https://api.minimax.chat/v1"
 
 
-def generate_summary_llm(text: str, title: str, max_chars: int = 600) -> str:
-    """Generate a structured summary using MiniMax LLM."""
-    # Truncate text to first 3000 chars to stay within token limits
+def generate_summary_llm(text: str, title: str,
+                         max_chars: int = 600) -> tuple[str, list[str]]:
+    """Generate summary + concepts using MiniMax LLM. Returns (summary, concepts)."""
     truncated = text[:3000]
 
-    prompt = f"""你是一个专业的知识整理助手。请为以下文章生成一段精炼的中文摘要。
+    prompt = f"""你是一个专业的知识整理助手。请为以下文章生成摘要，并提炼核心知识点。
 
 文章标题：{title}
 
 文章内容：
 {truncated}
 
-请按以下格式输出（只输出摘要，不要其他内容）：
-摘要：[一段200-400字的中文摘要，涵盖文章的核心观点和关键信息]"""
+请按以下 JSON 格式输出（只输出 JSON，不要其他内容）：
+{{"summary": "一段200-400字的中文摘要，涵盖文章的核心观点和关键信息", "concepts": ["概念1", "概念2", "概念3", "概念4", "概念5"]}}"""
 
     payload = {
         "model": "MiniMax-M2.5",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "max_tokens": 800,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1000,
         "temperature": 0.3,
-        "thinking": {"type": "off"},   # 关闭思考模式，避免产生 标签
+        "thinking": {"type": "off"},
     }
 
     req = urllib.request.Request(
@@ -70,13 +68,17 @@ def generate_summary_llm(text: str, title: str, max_chars: int = 600) -> str:
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read().decode("utf-8"))
             content = result["choices"][0]["message"]["content"]
-            # Strip thinking tags and "摘要：" prefix
-            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
-            content = re.sub(r"^摘要[：:]\s*", "", content.strip())
-            return content[:max_chars]
+            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+
+            # Parse JSON
+            data = json.loads(content)
+            summary = data.get("summary", "")[:max_chars]
+            concepts = data.get("concepts", [])
+            return summary, concepts
+
     except Exception as e:
         print(f"    [LLM] API 调用失败: {e}，降级到 TF-IDF")
-        return None
+        return None, None
 
 
 # ── Stopwords ──────────────────────────────────────────────────────────────
@@ -265,16 +267,18 @@ def is_new_file(vault: Path, manifest: dict, filepath: Path) -> bool:
 def make_summary_page(vault: Path, category: str, title: str,
                       text_content: str, source_url: str, date: str,
                       concepts: list[str], dry_run: bool = False,
-                      llm_summary: str = None) -> Path:
+                      llm_summary: str = None, llm_concepts: list[str] = None) -> Path:
     slug = slugify(title)
     target_dir = vault / "wiki" / category / "summaries"
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / f"{slug}.md"
 
-    # Use LLM summary if available, otherwise fall back to TF-IDF extract
+    # LLM takes full priority if available
     if llm_summary:
         summary_text = llm_summary
         generation_method = "LLM (MiniMax)"
+        if llm_concepts:
+            concepts = llm_concepts   # LLM concepts override TF-IDF
     else:
         summary_text = extract_summary(text_content)
         generation_method = "TF-IDF"
@@ -405,13 +409,15 @@ def main():
 
         # LLM summary generation (if --llm flag)
         llm_summary = None
+        llm_concepts = None
         if args.llm:
             if args.verbose or args.dry_run:
-                print(f"  [LLM] Generating summary with MiniMax...")
-            llm_summary = generate_summary_llm(text, title)
+                print(f"  [LLM] Generating summary + concepts with MiniMax...")
+            llm_summary, llm_concepts = generate_summary_llm(text, title)
 
         make_summary_page(vault, category, title, text, source_url, date,
-                        concepts, dry_run=args.dry_run, llm_summary=llm_summary)
+                        concepts, dry_run=args.dry_run,
+                        llm_summary=llm_summary, llm_concepts=llm_concepts)
         update_index_md(vault, category, title, slug, dry_run=args.dry_run)
 
         h = file_hash(filepath)
