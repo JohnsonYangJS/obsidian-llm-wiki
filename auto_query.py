@@ -13,20 +13,30 @@ MANIFEST_PATH = VAULT_ROOT / ".query-manifest.json"
 def extract_json(raw: str) -> dict:
     """Try multiple strategies to extract JSON from raw LLM response.
     
-    Handles two formats:
+    Handles:
     - Case A: clean JSON (no thinking) → find { and balance braces
-    - Case B: with thinking tag like ` Christensen... Christensen` (fullwidth Japanese quotes)
-      → extract from after the LAST ` Christensen` marker
+    - Case B: with  thinking tags → strip content before the closing tag
+    - Case C: with 「 Christensen... Christensen」 thinking tags (fullwidth quotes)
+      → extract from after the LAST closing marker
     """
     text = raw.strip()
     
-    # Case B: strip thinking tag — ` Christensen... Christensen`
-    # Find the LAST occurrence of ` Christensen` (with leading space + fullwidth opening quote `「`)
-    thinking_marker = " Christensen"
-    last_marker_pos = text.rfind(thinking_marker)
-    if last_marker_pos != -1:
-        # Extract everything after the last ` Christensen` marker
-        text = text[last_marker_pos + len(thinking_marker):].lstrip()
+    # Case B/C: strip thinking tags
+    # Standard XML-style:  ... 
+    # Also handle fullwidth Japanese quote variant: 「 Christensen... Christensen」
+    
+    # Strategy: find the last  Christensen or the last  Christensen
+    # and extract content after it
+    # Strip thinking tags: standard XML-style  ... 
+    # Find the last  Christensen (closing tag) and extract content after it
+    last_thinking_close = text.rfind(" Christensen")
+    if last_thinking_close != -1:
+        text = text[last_thinking_close + len(" Christensen"):].lstrip()
+    else:
+        # Fallback: fullwidth quote variant: 「 Christensen... Christensen」
+        last_marker_pos = text.rfind(" Christensen")
+        if last_marker_pos != -1:
+            text = text[last_marker_pos + len(" Christensen"):].lstrip()
     
     # Case A: find first { and balance braces
     for start in [text.find("{"), text.find("｛")]:
@@ -58,7 +68,7 @@ def llm_generate(text: str) -> dict:
         "请直接输出 JSON，包含三个字段：summary（100-200字中文摘要）、title（不超过30字的中文标题）、concepts（包含3个概念的列表）。只输出 JSON，不要其他内容。"
     )
     payload = json.dumps({
-        "model": "MiniMax-M2.7-highspeed",
+        "model": "MiniMax-M2.5",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 300,
         "temperature": 0.1,
@@ -226,7 +236,8 @@ def main():
                 # Skip placeholder responses
                 title = result.get("title", "")
                 summary = result.get("summary", "")
-                if not summary or title in ("...", "适合做页面标题的一句话（不超过30字）", "untitled"):
+                if not summary or len(summary) < 15:
+                    print(f"  SKIP (placeholder): summary={repr(summary[:50])}")
                     print(f"  SKIP (placeholder): title={repr(title)}")
                     manifest[key] = True
                     continue
