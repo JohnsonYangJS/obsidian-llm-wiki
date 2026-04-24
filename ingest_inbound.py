@@ -576,8 +576,8 @@ def channel_email(account: str, password: str, folder: str = "AI",
         if msg.is_multipart():
             for part in msg.walk():
                 ct = part.get_content_type()
-                cd = part.get_contentDisposition()
-                if cd and "attachment" in cd:
+                cd = part.get_content_disposition() or ""
+                if "attachment" in cd:
                     continue
                 charset = part.get_content_charset() or "utf-8"
                 payload = part.get_payload(decode=True)
@@ -781,7 +781,7 @@ def channel_gmail(account: str, password: str,
         if msg.is_multipart():
             for part in msg.walk():
                 ct = part.get_content_type()
-                cd = part.get_contentDisposition()
+                cd = part.get_content_disposition() or ""
                 if cd and "attachment" in cd: continue
                 charset = part.get_content_charset() or "utf-8"
                 payload = part.get_payload(decode=True)

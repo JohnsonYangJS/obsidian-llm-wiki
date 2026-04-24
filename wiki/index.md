@@ -62,3 +62,6 @@
 - [[summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了|我用OpenClaw，把flomo、Obsidian、Get笔记和ima知识库串起来了！]] — 2026-04-23
 - [[summaries/我用openclaw搭了个个人知识管理神器自动同步get笔记到obsidian双向链接自动生成效率直接拉满|我用OpenClaw搭了个个人知识管理神器：自动同步Get笔记到Obsidian，双向链接自动生成，效率直接拉满]] — 2026-04-23
 - [[summaries/全网爆火的大模型ai知识库保姆级教程来了|全网爆火的大模型AI知识库，保姆级教程来了]] — 2026-04-23
+- [[summaries/email-20260424-转发-this-week-on-superlinear-ac|email 20260424 转发 this week on superlinear ac]] — 2026-04-24
+- [[summaries/email-20260424-转发-pm-copilot我尝试为自己打造的agent|email 20260424 转发 pm copilot我尝试为自己打造的agent]] — 2026-04-24
+- [[summaries/email-20260424-转发-ai板块正式命名为superlinear-ai并限时开|email 20260424 转发 ai板块正式命名为superlinear ai并限时开]] — 2026-04-24
