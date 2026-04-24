@@ -180,6 +180,12 @@ sources: [raw/articles/llm-wiki-karpathy.md]
 5. 更新 `wiki/index.md`（如有新入口，在对应分类下添加链接）
 6. 追加 `log/YYYYMMDD.md`
 
+**增量更新原则**（auto_ingest.py 强制）：
+- LLM 判断 `action="update"` 时，读取现有文件，合并而非覆盖
+- 合并策略：保留 frontmatter `created`，更新 `updated`；将新 `related` 去重追加；将新章节追加到现有 body；将新 source 追加到 sources 列表
+- 合并后的 `related` 不超过 5 条，sources 不重复
+- `action="create"` 时正常新建
+
 **质量规则**：
 - 每个页面必须有 `title`、`type`、`created` 三个必填字段
 - `related` 至少包含 1 个双向链接

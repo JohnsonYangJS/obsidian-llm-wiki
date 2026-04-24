@@ -20,6 +20,7 @@ import math
 import re
 import subprocess
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -223,6 +224,8 @@ def llm_generate_wiki_page(title: str, source_text: str, existing_wiki: list[str
         "related": list[str],  # 相关页面标题列表
         "content": str,        # 页面正文（markdown）
         "sources": str,        # 来源
+        "action": str,         # "create" | "update"
+        "update_target": str,  # 当 action=update 时，为已有页面标题
     }
     """
     # 读取现有 wiki 页面标题，用于判断是新建还是更新
@@ -242,6 +245,12 @@ def llm_generate_wiki_page(title: str, source_text: str, existing_wiki: list[str
 ## TF-IDF 关键词提示（仅供参考）
 {", ".join(tfidf_concepts[:10])}
 
+## 增量更新逻辑
+
+请判断是新建页面还是更新已有页面：
+- 如果原文内容与某个已有页面主题高度相关（同一概念、同一工具等）→ action="update"，update_target 填该已有页面标题
+- 如果原文是全新主题 → action="create"
+
 ## 输出要求
 
 请直接输出 JSON，包含以下字段：
@@ -255,6 +264,8 @@ def llm_generate_wiki_page(title: str, source_text: str, existing_wiki: list[str
 - "related": 相关页面标题列表（从已有 Wiki 页面中匹配，或留空）
 - "content": 页面正文 markdown，使用 ## 章节结构，不要超过 800 字
 - "sources": 原始文件路径或 URL
+- "action": "create" 或 "update"
+- "update_target": 当 action="update" 时，填写已有页面标题；action="create" 时填 ""
 
 只输出 JSON，不要其他内容。"""
 
@@ -363,6 +374,8 @@ def make_wiki_page(vault: Path, llm_result: dict, category: str,
                    dry_run: bool = False) -> tuple[Path, str]:
     """
     Write a wiki page from LLM result.
+    - action="create": normal creation
+    - action="update": merge into existing page (keep frontmatter, append related/concepts/sections/sources)
     Returns (path, page_type)
     """
     page_type = llm_result.get("type", "concept")
@@ -379,6 +392,108 @@ def make_wiki_page(vault: Path, llm_result: dict, category: str,
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / f"{page_slug}.md"
 
+    action = llm_result.get("action", "create")
+
+    # ── Incremental update logic ───────────────────────────────────────────
+    if action == "update" and target_path.exists():
+        if dry_run:
+            print(f"  [DRY-RUN] Would UPDATE existing: {target_path}")
+            return target_path, page_type
+
+        existing_text = target_path.read_text(encoding="utf-8")
+
+        # Parse existing frontmatter
+        fm_match = re.search(r"^---\n(.*?)\n---\n(.*)$", existing_text, re.DOTALL)
+        if fm_match:
+            fm_block = fm_match.group(1)
+            existing_body = fm_match.group(2)
+        else:
+            fm_block = ""
+            existing_body = existing_text
+
+        # Extract existing frontmatter fields
+        def get_fm(field: str, default="") -> str:
+            m = re.search(rf"^{field}:\s*(.+)$", fm_block, re.MULTILINE)
+            return m.group(1).strip() if m else default
+
+        existing_created = get_fm("created", date)
+        existing_related_raw = get_fm("related", "")
+        existing_sources_raw = get_fm("sources", "")
+
+        # Parse existing sources list
+        existing_sources = []
+        src_m = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", existing_sources_raw)
+        for lbl, url in src_m:
+            existing_sources.append((lbl.strip(), url.strip()))
+        # Also handle bare sources like "[label]" without URL
+        for bare in re.findall(r"\[([^\]]+)\](?!\()", existing_sources_raw):
+            if bare.strip() and (bare.strip(), "") not in existing_sources:
+                existing_sources.append((bare.strip(), ""))
+
+        # Append new source if not already present
+        new_source = (title, source_url)
+        if new_source not in existing_sources:
+            existing_sources.append(new_source)
+
+        # Merge related concepts (deduplicate)
+        existing_related = []
+        for r in re.findall(r"\[\[([^\]]+)\]\]", existing_related_raw):
+            existing_related.append(r.strip())
+        new_related = llm_result.get("related", [])
+        for r in new_related:
+            if r not in existing_related:
+                existing_related.append(r)
+
+        # Build updated related
+        related_str = ", ".join(f"[[{r}]]" for r in existing_related[:5])
+        related_md = "\n".join(f"- [[{r}]]" for r in existing_related[:5])
+
+        # Merge sections from new content into existing body
+        # Find existing h2 sections in body
+        existing_sections = re.findall(r"(^## .+)$", existing_body, re.MULTILINE)
+        new_content = llm_result.get("content", llm_result.get("summary", ""))
+        new_sections = re.findall(r"(^## .+)$", new_content, re.MULTILINE)
+
+        # Append new sections that don't already exist
+        appended_sections = ""
+        for sec_title in new_sections:
+            if sec_title not in existing_sections:
+                # Extract section content
+                sec_pattern = re.escape(sec_title) + r"\n(.*?)(?=^## |\Z)"
+                sec_m = re.search(sec_pattern, new_content, re.MULTILINE | re.DOTALL)
+                sec_body = sec_m.group(1).strip() if sec_m else ""
+                appended_sections += f"\n{sec_title}\n{sec_body}\n"
+
+        # If no new sections to add, append a summary section
+        if not appended_sections:
+            appended_sections = f"\n## Summary from {title}\n\n> {llm_result.get('summary', '')[:200]}\n\n{llm_result.get('content', '')}\n"
+
+        merged_body = existing_body + appended_sections
+
+        # Build updated frontmatter
+        tags = llm_result.get("concepts", [])[:4]
+        sources_str = ", ".join(f"[{lbl}]({url})" if url else f"[{lbl}]" for lbl, url in existing_sources)
+
+        page = f"""---
+title: {llm_result.get("title", title)}
+type: {page_type}
+category: {category}
+tags: [{", ".join(tags)}]
+created: {existing_created}
+updated: {date}
+related: [{related_str}]
+sources: [{sources_str}]
+generation: LLM (MiniMax-M2.7-highspeed)
+---
+
+{merged_body}
+"""
+
+        target_path.write_text(page, encoding="utf-8")
+        print(f"  [MERGED] {target_path} (updated related, sections, sources)")
+        return target_path, page_type
+
+    # ── Normal create ───────────────────────────────────────────────────────
     # Build related wikilinks
     related = llm_result.get("related", [])
     if related:
@@ -430,13 +545,34 @@ generation: LLM (MiniMax-M2.7-highspeed)
 
 
 def update_index_md(vault: Path, page_slug: str, title: str, page_type: str, date: str,
-                    dry_run: bool = False):
-    """Add entry to wiki/index.md if not already present."""
-    index_path = vault / "wiki" / "index.md"
-    if not index_path.exists():
-        return
+                    dry_run: bool = False) -> bool:
+    """
+    Add entry to wiki/index.md if not already present.
+    Returns True if successful (entry added or already exists), False if index.md missing.
+    Creates index.md with template if it doesn't exist.
+    """
+    wiki_dir = vault / "wiki"
+    wiki_dir.mkdir(parents=True, exist_ok=True)
+    index_path = wiki_dir / "index.md"
 
-    content = index_path.read_text(encoding="utf-8")
+    if not index_path.exists():
+        # Auto-create template index
+        template = """# Wiki Index
+
+> 内容导向索引，LLM 查询时第一个读此文件定位相关页面。
+
+## Concepts
+
+## Entities
+
+## Summaries
+
+"""
+        if not dry_run:
+            index_path.write_text(template, encoding="utf-8")
+        content = template
+    else:
+        content = index_path.read_text(encoding="utf-8")
 
     # Determine section based on type
     if page_type == "summary":
@@ -450,7 +586,7 @@ def update_index_md(vault: Path, page_slug: str, title: str, page_type: str, dat
         link = f"- [[concepts/{page_slug}|{title}]]"
 
     if page_slug in content:
-        return
+        return True
 
     if section in content:
         content = content.replace(section, f"{link}\n\n{section}")
@@ -459,24 +595,27 @@ def update_index_md(vault: Path, page_slug: str, title: str, page_type: str, dat
 
     if not dry_run:
         index_path.write_text(content, encoding="utf-8")
+    return True
 
 
-def append_log(vault: Path, msg: str):
-    """Append entry to log/YYYYMMDD.md."""
+def append_log(vault: Path, operation: str, msg: str):
+    """
+    Append entry to log/YYYYMMDD.md in SCHEMA.md prescribed format.
+    Format: [HH:MM] OPERATION - description
+    """
     today = _dt.date.today().strftime("%Y%m%d")
     log_dir = vault / "log"
     log_dir.mkdir(exist_ok=True)
     log_path = log_dir / f"{today}.md"
     now = _dt.datetime.now().strftime("%H:%M")
-    entry = f"\n## [{now}] ingest | {msg}"
+    entry = f"\n[{now}] {operation} - {msg}"
     if log_path.exists():
         log_path.write_text(log_path.read_text(encoding="utf-8") + entry, encoding="utf-8")
     else:
-        log_path.write_text(f"# {today}\n\n## Daily Log\n{entry}\n", encoding="utf-8")
+        log_path.write_text(f"# {today}\n\n{entry}\n", encoding="utf-8")
 
 
 def main():
-    import time
 
     parser = argparse.ArgumentParser()
     parser.add_argument("vault", type=Path, nargs="?", default=Path("."))
@@ -522,20 +661,23 @@ def main():
         except Exception as e:
             print(f"  [ERROR] LLM generation failed: {e}", file=sys.stderr)
             if not args.dry_run:
-                append_log(vault, f"FAILED {filepath.name}: {e}")
+                append_log(vault, "INGEST", f"FAILED {filepath.name}: {e}")
             continue
 
         page_slug = slugify(llm_result.get("title", title))
         page_type = llm_result.get("type", "concept")
 
+        # Karpathy rule: MUST update index.md before creating page
+        index_ok = update_index_md(vault, page_slug, llm_result.get("title", title),
+                          page_type, date, dry_run=args.dry_run)
+        if not index_ok and not args.dry_run:
+            print(f"  [WARN] index.md update failed, skipping page write: {page_slug}")
+            continue
+
         target_path, _ = make_wiki_page(
             vault, llm_result, category, title, source_url, date,
             dry_run=args.dry_run,
         )
-
-        if not args.dry_run:
-            update_index_md(vault, page_slug, llm_result.get("title", title),
-                          page_type, date, dry_run=args.dry_run)
 
         h = file_hash(filepath)
         manifest["ingested"][str(filepath)] = h
@@ -543,7 +685,7 @@ def main():
         log_msg = (f"Ingested [LLM] {filepath.name} → wiki/{page_type}s/{page_slug}.md "
                    f"| concepts: {', '.join(llm_result.get('concepts', [])[:5])}")
         if not args.dry_run:
-            append_log(vault, log_msg)
+            append_log(vault, "INGEST", log_msg)
         created.append((category, page_type, page_slug))
 
     if not args.dry_run:
