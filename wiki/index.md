@@ -65,3 +65,4 @@
 - [[summaries/email-20260424-转发-this-week-on-superlinear-ac|email 20260424 转发 this week on superlinear ac]] — 2026-04-24
 - [[summaries/email-20260424-转发-pm-copilot我尝试为自己打造的agent|email 20260424 转发 pm copilot我尝试为自己打造的agent]] — 2026-04-24
 - [[summaries/email-20260424-转发-ai板块正式命名为superlinear-ai并限时开|email 20260424 转发 ai板块正式命名为superlinear ai并限时开]] — 2026-04-24
+- [[summaries/email-20260424-搜索-问问-gemini|email 20260424 搜索 问问 gemini]] — 2026-04-24
