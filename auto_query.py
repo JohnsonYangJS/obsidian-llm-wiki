@@ -214,10 +214,11 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
-    cutoff = _dt.datetime.now() - _dt.timedelta(hours=48)
-    recent_files = [f for f in SESSIONS_DIR.iterdir()
-                    if f.is_file() and f.stat().st_mtime > cutoff.timestamp()]
-    print(f"Found {len(recent_files)} recent session files")
+    # 只扫最后一个 session 文件（当前对话），避免被噪音淹没
+    all_files = sorted([f for f in SESSIONS_DIR.iterdir() if f.is_file()],
+                        key=lambda f: f.stat().st_mtime, reverse=True)
+    recent_files = [all_files[0]] if all_files else []
+    print(f"Scanning last session: {recent_files[0].name if recent_files else 'none'}")
     manifest = load_manifest()
     written = 0
     for filepath in sorted(recent_files):
