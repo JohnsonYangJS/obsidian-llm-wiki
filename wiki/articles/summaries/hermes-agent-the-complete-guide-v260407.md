@@ -2,14 +2,15 @@
 title: summaries/hermes-agent-the-complete-guide-v260407
 type: summary
 source_type: article
-date: 2026-04-23
-ingested: 2026-04-23
+date: 2026-04-24
+ingested: 2026-04-24
 tags: [researches, didn, trust, version]
+generation: LLM (MiniMax)
 ---
 
 # Hermes Agent The Complete Guide v260407
 
-**Source**: file:///Users/txyjs/Documents/Obsidian Vault/raw/Hermes-Agent-The-Complete-Guide-v260407.txt · 2026-04-23
+**Source**: file:///Users/txyjs/Documents/Obsidian Vault/raw/Hermes-Agent-The-Complete-Guide-v260407.txt · 2026-04-24
 
 ## Key takeaways
 
@@ -17,23 +18,15 @@ tags: [researches, didn, trust, version]
 
 ## Summary
 
-The Complete Guide
+<think>The user wants a concise Chinese summary (200-400 characters) of the article "Hermes Agent The Complete Guide v260407". The summary should cover the core points and key information of the article.
 
-The first AI Agent that ships with reins built in
-
-A practical guide to the Nous Research open-source
-
-The Agent That Grows With You
-
-Keywords: Self-improving Agent · Cross-session Memory · Skill System · MCP · Multi-platform
-
-For: Developers and AI enthusiasts who want to build a personal AI Agent
-
-Version: v260408
-
-WeChat: 花叔 · Bilibili: AI进化论-花生
-
-Based on Hermes Agent v0.7.0. AI tools evolve rapidly — some content may change with future versions. Refer to official docs for the latest.
+Let me analyze the article:
+- It's about Hermes Agent, an AI Agent from Nous Research
+- Key features: Self-improving Agent, Cross-session Memory, Skill System, MCP, Multi-platform
+- Based on Harness Engineering concept
+- Released February 2026, gained 27k+ GitHub stars quickly
+- Different from OpenClaw (lobster)
+- Contains 5 parts: Concepts, Core Mechanisms, Hands-On Setup, Real-World Scenari
 
 ## Concepts introduced / referenced
 
