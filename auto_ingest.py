@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-auto_ingest.py — 自动扫描 raw/ 新文件，生成 Wiki 页面骨架。
+auto_ingest.py — LLM 驱动的知识库摄入脚本（Karpathy 方案）
 
-Usage:
-    python3 auto_ingest.py <vault-root> [--dry-run] [--verbose] [--llm]
+核心变更：
+- 不再使用 TF-IDF 生成 summary，改为调用 MiniMax-M2.7-highspeed 生成结构化 Wiki 页面
+- 生成位置：wiki/concepts/、wiki/entities/、wiki/summaries/
+- 更新 wiki/index.md（增量添加链接）
+- 追加 log/YYYYMMDD.md
 
-Options:
-    --llm   用 MiniMax LLM 生成 summary（比 TF-IDF 更智能）
+用法：
+    python3 auto_ingest.py <vault-root> [--dry-run] [-v]
 """
 
 import argparse
@@ -14,100 +17,41 @@ import datetime as _dt
 import hashlib
 import json
 import math
-import os
 import re
-import shutil
+import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional
 
-# ── MiniMax LLM ───────────────────────────────────────────────────────────
-
-import urllib.request
-import urllib.error
-
+# ── MiniMax 配置 ─────────────────────────────────────────────────────────────
 MINIMAX_API_KEY = "sk-cp-SUjytMlOmz-9qX73aXQbhNog3hEQmYoLxVff1IkOVFCJ_pia4t0ykTJSgp3bQ3aWvmIyIu-HJvNRCZEXHRTL_rFGARGtSpURNHNunmm5yXTucUaLJDH1uaE"
 MINIMAX_BASE = "https://api.minimax.chat/v1"
+MODEL = "MiniMax-M2.7-highspeed"
 
-
-def generate_summary_llm(text: str, title: str,
-                         max_chars: int = 600) -> tuple[str, list[str]]:
-    """Generate summary + concepts using MiniMax LLM. Returns (summary, concepts)."""
-    truncated = text[:3000]
-
-    prompt = f"""你是一个专业的知识整理助手。请为以下文章生成摘要，并提炼核心知识点。
-
-文章标题：{title}
-
-文章内容：
-{truncated}
-
-请按以下 JSON 格式输出（只输出 JSON，不要其他内容）：
-{{"summary": "一段200-400字的中文摘要，涵盖文章的核心观点和关键信息", "concepts": ["概念1", "概念2", "概念3", "概念4", "概念5"]}}"""
-
-    payload = {
-        "model": "MiniMax-M2.7-highspeed",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1000,
-        "temperature": 0.3,
-        "thinking": {"type": "off"},
-    }
-
-    req = urllib.request.Request(
-        f"{MINIMAX_BASE}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {MINIMAX_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-            content = result["choices"][0]["message"]["content"]
-            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
-
-            # Parse JSON
-            data = json.loads(content)
-            summary = data.get("summary", "")[:max_chars]
-            concepts = data.get("concepts", [])
-            return summary, concepts
-
-    except Exception as e:
-        print(f"    [LLM] API 调用失败: {e}，降级到 TF-IDF")
-        return None, None
-
-
-# ── Stopwords ──────────────────────────────────────────────────────────────
-
+# ── Stopwords（仅用于关键词提取辅助，LLM 生成不再是它）─────────────────────────
 STOPWORDS = {
     "的", "了", "和", "是", "在", "就", "都", "而", "及", "与",
     "着", "或", "一个", "没有", "我们", "你们", "他们", "这个",
-    "那个", "因为", "所以", "但是", "如果", "虽然", "还是",
     "the", "a", "an", "is", "are", "was", "were", "be", "been",
     "have", "has", "had", "do", "does", "did", "will", "would",
-    "can", "could", "should", "may", "might", "must", "shall",
+    "can", "could", "should", "may", "might", "must",
     "and", "or", "but", "if", "then", "when", "this", "that",
-    "these", "those", "it", "its", "they", "them", "their",
-    "not", "no", "nor", "for", "so", "as", "at", "by", "from",
-    "in", "of", "on", "to", "with", "about", "into", "through",
-    "during", "before", "after", "above", "below", "up", "down",
-    "out", "off", "over", "under", "again", "further", "once",
+    "not", "no", "for", "so", "as", "at", "by", "from",
+    "in", "of", "on", "to", "with", "about", "into",
 }
 
 NGRAM_RE = re.compile(r"[\u4e00-\u9fff]{2,}|[\w]{4,}")
 
 
 def tokenize(text: str) -> list[str]:
+    """Strip frontmatter and tokenize."""
     text = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.DOTALL)
     tokens = NGRAM_RE.findall(text.lower())
     return [t for t in tokens if t.lower() not in STOPWORDS and len(t) > 1]
 
 
 def build_tfidf(corpus: list[str]) -> dict[str, float]:
+    """Build TF-IDF map from list of texts. Used only for keyword hints."""
     docs = [tokenize(d) for d in corpus]
     df = defaultdict(int)
     for doc in docs:
@@ -126,7 +70,7 @@ def build_tfidf(corpus: list[str]) -> dict[str, float]:
 
 
 def extract_top_concepts(text: str, top_n: int = 8) -> list[str]:
-    """Extract top concept keywords using TF-IDF (strips frontmatter)."""
+    """Extract top concept keywords using TF-IDF (only as hints for LLM)."""
     text = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.DOTALL)
     sentences = re.split(r"[。！？\n]+", text)
     sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
@@ -161,12 +105,9 @@ def clean_ocr_text(text: str) -> str:
 def extract_date(text: str) -> str:
     """Extract date from frontmatter or body, return YYYY-MM-DD."""
     today = _dt.date.today().isoformat()
-
-    # Frontmatter first
     fm_match = re.search(r"^---\n(.*?)\n---", text, re.DOTALL)
     if fm_match:
         fm = fm_match.group(1)
-        # Match: 2026-04-23  or  2026年4月23日  or  2026-04
         for pattern in [
             r"20\d{2}[-年](\d{1,2})[-月](\d{1,2})",
             r"20\d{2}[-年](\d{1,2})",
@@ -186,7 +127,6 @@ def extract_date(text: str) -> str:
                 except (ValueError, OverflowError):
                     pass
 
-    # Body
     body = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.DOTALL)
     for pattern in [
         r"(20\d{2})[-年](\d{1,2})[-月](\d{1,2})",
@@ -201,45 +141,15 @@ def extract_date(text: str) -> str:
     return today
 
 
-def extract_summary(text: str, max_chars: int = 500) -> str:
-    """Extract lead paragraph + key sentences as a summary."""
-    text = re.sub(r"^---\n.*?\n---\n", "", text, flags=re.DOTALL)
-    text = clean_ocr_text(text)
-    lines = [l.strip() for l in text.split("\n") if l.strip() and len(l.strip()) > 15]
-    skip_pattern = re.compile(r"^[A-Z\s]{5,}$|^[─=\s]+$|^ORANGE\s*BOOK|^PUBLISHED|^更新时间")
-    summary_lines, chars = [], 0
-    for line in lines:
-        if skip_pattern.match(line):
-            continue
-        if chars + len(line) > max_chars:
-            break
-        summary_lines.append(line)
-        chars += len(line)
-    return "\n\n".join(summary_lines) if summary_lines else text[:max_chars]
-
-
-def detect_category(filepath: Path) -> str:
-    path_str, name = str(filepath).lower(), filepath.stem.lower()
-    if "paper" in path_str or "arxiv" in path_str or "pdf" in path_str:
-        return "papers"
-    if "article" in path_str or "blog" in path_str or "post" in path_str:
-        return "articles"
-    if "note" in path_str or "memo" in path_str or "thinking" in path_str:
-        return "notes"
-    if "ref" in path_str or "book" in path_str:
-        return "refs"
-    if any(k in name for k in ["guide", "tutorial", "how", "使用", "教程", "入门"]):
-        return "articles"
-    return "articles"
-
-
 def slugify(text: str) -> str:
+    """Convert title to filename-safe slug."""
     s = re.sub(r"[^\w\s-]", "", text)
     s = re.sub(r"[\s_]+", "-", s)
     return re.sub(r"-+", "-", s).strip("-").lower()[:60]
 
 
 def file_hash(filepath: Path) -> str:
+    """Hash based on path + mtime + size."""
     stat = filepath.stat()
     key = f"{filepath}:{stat.st_mtime:.0f}:{stat.st_size}"
     return hashlib.sha256(key.encode()).hexdigest()[:16]
@@ -264,90 +174,129 @@ def is_new_file(vault: Path, manifest: dict, filepath: Path) -> bool:
     return manifest.get("ingested", {}).get(str(filepath)) != h
 
 
-def make_summary_page(vault: Path, category: str, title: str,
-                      text_content: str, source_url: str, date: str,
-                      concepts: list[str], dry_run: bool = False,
-                      llm_summary: str = None, llm_concepts: list[str] = None) -> Path:
-    slug = slugify(title)
-    target_dir = vault / "wiki" / category / "summaries"
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target_path = target_dir / f"{slug}.md"
+# ── LLM Summary Generation ────────────────────────────────────────────────────
 
-    # LLM takes full priority if available
-    if llm_summary:
-        summary_text = llm_summary
-        generation_method = "LLM (MiniMax)"
-        if llm_concepts:
-            concepts = llm_concepts   # LLM concepts override TF-IDF
-    else:
-        summary_text = extract_summary(text_content)
-        generation_method = "TF-IDF"
-    tags = concepts[:4]
+def extract_json(raw: str) -> dict:
+    """Extract JSON from LLM response, handling <thinking> tags."""
+    text = raw.strip()
 
-    page = f"""---
-title: summaries/{slug}
-type: summary
-source_type: article
-date: {date}
-ingested: {_dt.date.today().isoformat()}
-tags: [{", ".join(tags)}]
-generation: {generation_method}
----
+    # Strip thinking tags
+    for open_tag in ["<thinking>", " Christensen"]:
+        close_tag = " </thinking>" if open_tag == "<thinking>" else " Christensen"
+        idx = text.rfind(close_tag)
+        if idx != -1:
+            text = text[idx + len(close_tag):].lstrip()
 
-# {title}
-
-**Source**: {source_url} · {date}
-
-## Key takeaways
-
-- {" · ".join(concepts[:5])}
-
-## Summary
-
-{summary_text}
-
-## Concepts introduced / referenced
-
-{" · ".join(f"[[{c}]]" for c in concepts[:5])}
-"""
-    if dry_run:
-        print(f"  [DRY-RUN] Would create: {target_path}")
-        return target_path
-    target_path.write_text(page, encoding="utf-8")
-    return target_path
+    for start in [text.find("{"), text.find("｛")]:
+        if start == -1:
+            continue
+        json_str = text[start:]
+        count = 0
+        end_pos = 0
+        for i, c in enumerate(json_str):
+            if c in "{[":
+                count += 1
+            elif c in "}]":
+                count -= 1
+            if count == 0:
+                end_pos = i + 1
+                break
+        if end_pos > 0:
+            try:
+                return json.loads(json_str[:end_pos])
+            except json.JSONDecodeError:
+                pass
+    raise ValueError(f"No parseable JSON found in: {repr(raw[:200])}")
 
 
-def update_index_md(vault: Path, category: str, title: str, slug: str, dry_run: bool = False):
-    index_path = vault / "wiki" / "index.md"
-    if not index_path.exists():
-        return
-    content = index_path.read_text(encoding="utf-8")
-    anchor = f"- [[summaries/{slug}|{title}]]"
-    if f"summaries/{slug}" in content:
-        return
-    marker = "## Open Questions"
-    if marker in content:
-        content = content.replace(marker, f"{anchor}\n\n{marker}")
-    else:
-        content += f"\n- [[summaries/{slug}|{title}]] — {_dt.date.today().isoformat()}"
-    if not dry_run:
-        index_path.write_text(content, encoding="utf-8")
+def llm_generate_wiki_page(title: str, source_text: str, existing_wiki: list[str],
+                           tfidf_concepts: list[str]) -> dict:
+    """
+    调用 MiniMax 生成结构化 Wiki 页面。
+
+    返回 dict：
+    {
+        "title": str,          # 英文 slug 风格标题
+        "summary": str,         # 200-400 字摘要
+        "concepts": list[str], # 3-8 个关键概念
+        "type": str,           # concept | entity | summary
+        "related": list[str],  # 相关页面标题列表
+        "content": str,        # 页面正文（markdown）
+        "sources": str,        # 来源
+    }
+    """
+    # 读取现有 wiki 页面标题，用于判断是新建还是更新
+    existing_list = "\n".join(f"- {t}" for t in existing_wiki[:20])
+
+    prompt = f"""你是一个 LLM Wiki 知识库维护 Agent。请根据以下原文内容，生成一个结构化 Wiki 页面。
+
+## 原文标题
+{title}
+
+## 原文内容（部分）
+{source_text[: 8000]}
+
+## 已有的 Wiki 页面标题（用于判断是否已存在相关页面）
+{existing_list if existing_list else "(暂无)"}
+
+## TF-IDF 关键词提示（仅供参考）
+{", ".join(tfidf_concepts[:10])}
+
+## 输出要求
+
+请直接输出 JSON，包含以下字段：
+- "title": 页面标题，使用英文 slug 风格（如 llm-wiki-pattern）
+- "summary": 200-400 字摘要，概括文章核心内容
+- "concepts": 3-8 个关键概念列表（用于双向链接）
+- "type": 页面类型，选择其一：concept（概念页）| entity（实体页）| summary（摘要页）
+  - concept：方法论、理念、模式
+  - entity：人物、工具、论文、产品
+  - summary：文章/文档的摘要
+- "related": 相关页面标题列表（从已有 Wiki 页面中匹配，或留空）
+- "content": 页面正文 markdown，使用 ## 章节结构，不要超过 800 字
+- "sources": 原始文件路径或 URL
+
+只输出 JSON，不要其他内容。"""
+
+    payload = json.dumps({
+        "model": MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 3000,
+        "temperature": 0.2,
+    })
+
+    for attempt in range(3):
+        proc = subprocess.run(
+            ["curl", "-s", "-X", "POST", f"{MINIMAX_BASE}/chat/completions",
+             "-H", f"Authorization: Bearer {MINIMAX_API_KEY}",
+             "-H", "Content-Type: application/json",
+             "-d", payload, "--noproxy", "*", "--max-time", "60"],
+            capture_output=True, text=True, timeout=65,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"curl rc={proc.returncode}: {proc.stderr}")
+
+        raw = json.loads(proc.stdout)["choices"][0]["message"]["content"]
+        try:
+            result = extract_json(raw)
+            # Validate required fields
+            for field in ("title", "summary", "type"):
+                if field not in result:
+                    raise ValueError(f"Missing field: {field}")
+            return result
+        except (ValueError, json.JSONDecodeError) as e:
+            if attempt < 2:
+                time.sleep(1)
+                continue
+            raise RuntimeError(f"LLM response parse failed after 3 attempts: {e}\nRaw: {raw[:500]}")
+
+    raise RuntimeError("unreachable")
 
 
-def append_log(vault: Path, msg: str):
-    today = _dt.date.today().strftime("%Y%m%d")
-    log_dir = vault / "log"
-    log_dir.mkdir(exist_ok=True)
-    log_path = log_dir / f"{today}.md"
-    now = _dt.datetime.now().strftime("%H:%M")
-    entry = f"\n## [{now}] ingest | {msg}"
-    if log_path.exists():
-        log_path.write_text(log_path.read_text(encoding="utf-8") + entry, encoding="utf-8")
-    else:
-        log_path.write_text(f"# {today}\n\n## Daily Log\n{entry}\n", encoding="utf-8")
-
+# ── File Scanning ─────────────────────────────────────────────────────────────
 
 def scan_raw(vault: Path) -> list[tuple[Path, str]]:
+    """Scan raw/ for processable text files."""
     raw_dir = vault / "raw"
     results = []
     SKIP_NAMES = {"all_notes", "readme", "index", "tmp", "draft"}
@@ -374,13 +323,165 @@ def scan_raw(vault: Path) -> list[tuple[Path, str]]:
     return results
 
 
+def get_existing_wiki_titles(vault: Path) -> list[str]:
+    """Read all existing wiki page titles for context."""
+    wiki_dir = vault / "wiki"
+    titles = []
+    if not wiki_dir.exists():
+        return titles
+    for md_file in wiki_dir.rglob("*.md"):
+        text = md_file.read_text(encoding="utf-8", errors="ignore")
+        # Extract title from frontmatter or first H1
+        fm_match = re.search(r"^---\n.*?\ntitle:\s*(.+?)\n", text, re.DOTALL)
+        if fm_match:
+            titles.append(fm_match.group(1).strip())
+        else:
+            h1_match = re.search(r"^#\s+(.+)$", text, re.MULTILINE)
+            if h1_match:
+                titles.append(h1_match.group(1).strip())
+    return titles
+
+
+def detect_category(filepath: Path) -> str:
+    """Detect category based on path and filename."""
+    path_str, name = str(filepath).lower(), filepath.stem.lower()
+    if "paper" in path_str or "arxiv" in path_str or "pdf" in path_str:
+        return "papers"
+    if "article" in path_str or "blog" in path_str or "post" in path_str:
+        return "articles"
+    if "note" in path_str or "memo" in path_str or "thinking" in path_str:
+        return "notes"
+    if "ref" in path_str or "book" in path_str:
+        return "refs"
+    if any(k in name for k in ["guide", "tutorial", "how", "使用", "教程", "入门"]):
+        return "articles"
+    return "articles"
+
+
+def make_wiki_page(vault: Path, llm_result: dict, category: str,
+                   title: str, source_url: str, date: str,
+                   dry_run: bool = False) -> tuple[Path, str]:
+    """
+    Write a wiki page from LLM result.
+    Returns (path, page_type)
+    """
+    page_type = llm_result.get("type", "concept")
+    page_slug = slugify(llm_result.get("title", title))
+
+    # Determine target directory based on type
+    if page_type == "summary":
+        target_dir = vault / "wiki" / "summaries"
+    elif page_type == "entity":
+        target_dir = vault / "wiki" / "entities"
+    else:
+        target_dir = vault / "wiki" / "concepts"
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / f"{page_slug}.md"
+
+    # Build related wikilinks
+    related = llm_result.get("related", [])
+    if related:
+        related_md = "\n".join(f"- [[{r}]]" for r in related[:5])
+        related_frontmatter = ", ".join(f"[[{r}]]" for r in related[:5])
+    else:
+        related_md = "- (待补充)"
+        related_frontmatter = ""
+
+    tags = llm_result.get("concepts", [])[:4]
+    content_body = llm_result.get("content", llm_result.get("summary", ""))
+
+    page = f"""---
+title: {llm_result.get("title", title)}
+type: {page_type}
+category: {category}
+tags: [{", ".join(tags)}]
+created: {date}
+updated: {date}
+related: [{related_frontmatter}]
+sources: [{source_url}]
+generation: LLM (MiniMax-M2.7-highspeed)
+---
+
+# {llm_result.get("title", title)}
+
+> {llm_result.get("summary", "")[:200]}
+
+{content_body}
+
+## Related
+
+{related_md}
+
+## Sources
+
+- [{title}]({source_url})
+
+---
+*由 auto_ingest.py 自动生成于 {date}*
+"""
+
+    if dry_run:
+        print(f"  [DRY-RUN] Would create: {target_path}")
+        return target_path, page_type
+
+    target_path.write_text(page, encoding="utf-8")
+    return target_path, page_type
+
+
+def update_index_md(vault: Path, page_slug: str, title: str, page_type: str, date: str,
+                    dry_run: bool = False):
+    """Add entry to wiki/index.md if not already present."""
+    index_path = vault / "wiki" / "index.md"
+    if not index_path.exists():
+        return
+
+    content = index_path.read_text(encoding="utf-8")
+
+    # Determine section based on type
+    if page_type == "summary":
+        section = "## Summaries"
+        link = f"- [[summaries/{page_slug}|{title}]]"
+    elif page_type == "entity":
+        section = "## Entities"
+        link = f"- [[entities/{page_slug}|{title}]]"
+    else:
+        section = "## Concepts"
+        link = f"- [[concepts/{page_slug}|{title}]]"
+
+    if page_slug in content:
+        return
+
+    if section in content:
+        content = content.replace(section, f"{link}\n\n{section}")
+    else:
+        content += f"\n\n{link} — {date}"
+
+    if not dry_run:
+        index_path.write_text(content, encoding="utf-8")
+
+
+def append_log(vault: Path, msg: str):
+    """Append entry to log/YYYYMMDD.md."""
+    today = _dt.date.today().strftime("%Y%m%d")
+    log_dir = vault / "log"
+    log_dir.mkdir(exist_ok=True)
+    log_path = log_dir / f"{today}.md"
+    now = _dt.datetime.now().strftime("%H:%M")
+    entry = f"\n## [{now}] ingest | {msg}"
+    if log_path.exists():
+        log_path.write_text(log_path.read_text(encoding="utf-8") + entry, encoding="utf-8")
+    else:
+        log_path.write_text(f"# {today}\n\n## Daily Log\n{entry}\n", encoding="utf-8")
+
+
 def main():
+    import time
+
     parser = argparse.ArgumentParser()
     parser.add_argument("vault", type=Path, nargs="?", default=Path("."))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("--llm", action="store_true",
-                        help="用 MiniMax LLM 生成 summary（更智能）")
     args = parser.parse_args()
 
     vault = args.vault.resolve()
@@ -393,7 +494,9 @@ def main():
 
     if not new_files:
         print("No new files to ingest.")
-        sys.exit(1)
+        sys.exit(0)
+
+    existing_titles = get_existing_wiki_titles(vault)
 
     created = []
     for filepath, text in new_files:
@@ -402,39 +505,55 @@ def main():
 
         title = filepath.stem.replace("-", " ").replace("_", " ")
         category = detect_category(filepath)
-        concepts = extract_top_concepts(text)
-        slug = slugify(title)
+        tfidf_concepts = extract_top_concepts(text)
         date = extract_date(text)
         source_url = f"file://{filepath}"
 
-        # LLM summary generation (if --llm flag)
-        llm_summary = None
-        llm_concepts = None
-        if args.llm:
-            if args.verbose or args.dry_run:
-                print(f"  [LLM] Generating summary + concepts with MiniMax...")
-            llm_summary, llm_concepts = generate_summary_llm(text, title)
+        if args.verbose or args.dry_run:
+            print(f"  [LLM] Generating wiki page with MiniMax-M2.7-highspeed...")
 
-        make_summary_page(vault, category, title, text, source_url, date,
-                        concepts, dry_run=args.dry_run,
-                        llm_summary=llm_summary, llm_concepts=llm_concepts)
-        update_index_md(vault, category, title, slug, dry_run=args.dry_run)
+        try:
+            llm_result = llm_generate_wiki_page(
+                title=title,
+                source_text=text,
+                existing_wiki=existing_titles,
+                tfidf_concepts=tfidf_concepts,
+            )
+        except Exception as e:
+            print(f"  [ERROR] LLM generation failed: {e}", file=sys.stderr)
+            if not args.dry_run:
+                append_log(vault, f"FAILED {filepath.name}: {e}")
+            continue
+
+        page_slug = slugify(llm_result.get("title", title))
+        page_type = llm_result.get("type", "concept")
+
+        target_path, _ = make_wiki_page(
+            vault, llm_result, category, title, source_url, date,
+            dry_run=args.dry_run,
+        )
+
+        if not args.dry_run:
+            update_index_md(vault, page_slug, llm_result.get("title", title),
+                          page_type, date, dry_run=args.dry_run)
 
         h = file_hash(filepath)
         manifest["ingested"][str(filepath)] = h
 
-        method_tag = "LLM" if llm_summary else "TF-IDF"
+        log_msg = (f"Ingested [LLM] {filepath.name} → wiki/{page_type}s/{page_slug}.md "
+                   f"| concepts: {', '.join(llm_result.get('concepts', [])[:5])}")
         if not args.dry_run:
-            append_log(vault, f"Ingested [{method_tag}] {filepath.name} → wiki/{category}/summaries/{slug}.md | concepts: {', '.join(concepts[:5])}")
-        created.append((category, title, slug))
+            append_log(vault, log_msg)
+        created.append((category, page_type, page_slug))
 
     if not args.dry_run:
         manifest["last_run"] = _dt.datetime.now(_dt.timezone.utc).isoformat()
         save_manifest(vault, manifest)
 
-    print(f"\nDone. {'[DRY-RUN] ' if args.dry_run else ''}Processed {len(new_files)} new file(s), created {len(created)} page(s).")
-    for cat, title, slug in created:
-        print(f"  → wiki/{cat}/summaries/{slug}.md")
+    print(f"\nDone. {'[DRY-RUN] ' if args.dry_run else ''}"
+          f"Processed {len(new_files)} new file(s), created {len(created)} page(s).")
+    for cat, ptype, slug in created:
+        print(f"  → wiki/{ptype}s/{slug}.md")
 
 
 if __name__ == "__main__":
