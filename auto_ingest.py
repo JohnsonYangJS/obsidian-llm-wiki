@@ -3,7 +3,10 @@
 auto_ingest.py — 自动扫描 raw/ 新文件，生成 Wiki 页面骨架。
 
 Usage:
-    python3 auto_ingest.py <vault-root> [--dry-run] [--verbose]
+    python3 auto_ingest.py <vault-root> [--dry-run] [--verbose] [--llm]
+
+Options:
+    --llm   用 MiniMax LLM 生成 summary（比 TF-IDF 更智能）
 """
 
 import argparse
@@ -18,6 +21,63 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Optional
+
+# ── MiniMax LLM ───────────────────────────────────────────────────────────
+
+import urllib.request
+import urllib.error
+
+MINIMAX_API_KEY = "sk-cp-SUjytMlOmz-9qX73aXQbhNog3hEQmYoLxVff1IkOVFCJ_pia4t0ykTJSgp3bQ3aWvmIyIu-HJvNRCZEXHRTL_rFGARGtSpURNHNunmm5yXTucUaLJDH1uaE"
+MINIMAX_BASE = "https://api.minimax.chat/v1"
+
+
+def generate_summary_llm(text: str, title: str, max_chars: int = 600) -> str:
+    """Generate a structured summary using MiniMax LLM."""
+    # Truncate text to first 3000 chars to stay within token limits
+    truncated = text[:3000]
+
+    prompt = f"""你是一个专业的知识整理助手。请为以下文章生成一段精炼的中文摘要。
+
+文章标题：{title}
+
+文章内容：
+{truncated}
+
+请按以下格式输出（只输出摘要，不要其他内容）：
+摘要：[一段200-400字的中文摘要，涵盖文章的核心观点和关键信息]"""
+
+    payload = {
+        "model": "MiniMax-M2.5",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 800,
+        "temperature": 0.3,
+        "thinking": {"type": "off"},   # 关闭思考模式，避免产生 标签
+    }
+
+    req = urllib.request.Request(
+        f"{MINIMAX_BASE}/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {MINIMAX_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            content = result["choices"][0]["message"]["content"]
+            # Strip thinking tags and "摘要：" prefix
+            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+            content = re.sub(r"^摘要[：:]\s*", "", content.strip())
+            return content[:max_chars]
+    except Exception as e:
+        print(f"    [LLM] API 调用失败: {e}，降级到 TF-IDF")
+        return None
+
 
 # ── Stopwords ──────────────────────────────────────────────────────────────
 
@@ -204,13 +264,20 @@ def is_new_file(vault: Path, manifest: dict, filepath: Path) -> bool:
 
 def make_summary_page(vault: Path, category: str, title: str,
                       text_content: str, source_url: str, date: str,
-                      concepts: list[str], dry_run: bool = False) -> Path:
+                      concepts: list[str], dry_run: bool = False,
+                      llm_summary: str = None) -> Path:
     slug = slugify(title)
     target_dir = vault / "wiki" / category / "summaries"
     target_dir.mkdir(parents=True, exist_ok=True)
     target_path = target_dir / f"{slug}.md"
 
-    summary_text = extract_summary(text_content)
+    # Use LLM summary if available, otherwise fall back to TF-IDF extract
+    if llm_summary:
+        summary_text = llm_summary
+        generation_method = "LLM (MiniMax)"
+    else:
+        summary_text = extract_summary(text_content)
+        generation_method = "TF-IDF"
     tags = concepts[:4]
 
     page = f"""---
@@ -220,6 +287,7 @@ source_type: article
 date: {date}
 ingested: {_dt.date.today().isoformat()}
 tags: [{", ".join(tags)}]
+generation: {generation_method}
 ---
 
 # {title}
@@ -307,6 +375,8 @@ def main():
     parser.add_argument("vault", type=Path, nargs="?", default=Path("."))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--llm", action="store_true",
+                        help="用 MiniMax LLM 生成 summary（更智能）")
     args = parser.parse_args()
 
     vault = args.vault.resolve()
@@ -333,15 +403,23 @@ def main():
         date = extract_date(text)
         source_url = f"file://{filepath}"
 
+        # LLM summary generation (if --llm flag)
+        llm_summary = None
+        if args.llm:
+            if args.verbose or args.dry_run:
+                print(f"  [LLM] Generating summary with MiniMax...")
+            llm_summary = generate_summary_llm(text, title)
+
         make_summary_page(vault, category, title, text, source_url, date,
-                        concepts, dry_run=args.dry_run)
+                        concepts, dry_run=args.dry_run, llm_summary=llm_summary)
         update_index_md(vault, category, title, slug, dry_run=args.dry_run)
 
         h = file_hash(filepath)
         manifest["ingested"][str(filepath)] = h
 
+        method_tag = "LLM" if llm_summary else "TF-IDF"
         if not args.dry_run:
-            append_log(vault, f"Ingested {filepath.name} → wiki/{category}/summaries/{slug}.md | concepts: {', '.join(concepts[:5])}")
+            append_log(vault, f"Ingested [{method_tag}] {filepath.name} → wiki/{category}/summaries/{slug}.md | concepts: {', '.join(concepts[:5])}")
         created.append((category, title, slug))
 
     if not args.dry_run:
