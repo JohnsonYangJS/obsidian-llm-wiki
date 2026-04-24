@@ -2,12 +2,13 @@
 """
 ingest_inbound.py — 多渠道内容入库脚本
 
-支持 5 个渠道：
+支持 6 个渠道：
   1. 飞书文件下载        --channel feishu [--chat-id ID] [--since MINUTES]
   2. 飞书云文档抓取       --channel feishu-doc --url URL
   3. URL 内容抓取         --channel url --url URL [--title TITLE]
   4. raw/ 目录监控       --channel watcher [--watch-dir DIR]
-  5. 邮件入库            --channel email --account --folder --password
+  5. 邮件入库 (Hotmail)   --channel email --account --folder --password
+  6. 邮件入库 (Gmail)    --channel gmail --account --password
 
 Usage:
   python3 ingest_inbound.py --channel feishu --chat-id oc_xxx
@@ -736,11 +737,195 @@ def channel_email(account: str, password: str, folder: str = "AI",
     return new_count
 
 
+# ── Channel 6: Gmail 邮件入库 ──────────────────────────────────────────────
+
+def channel_gmail(account: str, password: str,
+                  senders: list = None, dry_run: bool = False):
+    import email, email.header, imaplib, re
+    from html import parser as html_parser
+
+    if senders is None:
+        senders = ["superlinear", "memo"]
+
+    log(f"📧 Gmail 入库: {account}")
+
+    class HTMLTextExtractor(html_parser.HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.text_parts = []
+            self.skip_tags = {'script', 'style', 'head', 'meta', 'link'}
+            self.in_skip = False
+        def handle_starttag(self, tag, attrs):
+            if tag in self.skip_tags: self.in_skip = True
+        def handle_endtag(self, tag):
+            if tag in self.skip_tags: self.in_skip = False
+            if tag == 'br': self.text_parts.append('\n')
+            if tag == 'p': self.text_parts.append('\n\n')
+        def handle_data(self, data):
+            if not self.in_skip: self.text_parts.append(data)
+        def get_text(self):
+            return re.sub(r'\n{3,}', '\n\n', "".join(self.text_parts)).strip()
+
+    def decode_header_value(value):
+        parts = email.header.decode_header(value)
+        result = []
+        for part, charset in parts:
+            if isinstance(part, bytes):
+                result.append(part.decode(charset or "utf-8", errors="replace"))
+            else:
+                result.append(part)
+        return "".join(result)
+
+    def extract_body(msg) -> str:
+        body_text, body_html = None, None
+        if msg.is_multipart():
+            for part in msg.walk():
+                ct = part.get_content_type()
+                cd = part.get_contentDisposition()
+                if cd and "attachment" in cd: continue
+                charset = part.get_content_charset() or "utf-8"
+                payload = part.get_payload(decode=True)
+                if not payload: continue
+                text = payload.decode(charset, errors="replace")
+                if ct == "text/plain" and body_text is None:
+                    body_text = text
+                elif ct == "text/html" and body_html is None:
+                    body_html = text
+        else:
+            charset = msg.get_content_charset() or "utf-8"
+            payload = msg.get_payload(decode=True)
+            if payload:
+                text = payload.decode(charset, errors="replace")
+                if msg.get_content_type() == "text/html":
+                    body_html = text
+                else:
+                    body_text = text
+        if body_text: return body_text.strip()
+        elif body_html:
+            ex = HTMLTextExtractor()
+            ex.feed(body_html)
+            return ex.get_text()
+        return ""
+
+    try:
+        m = imaplib.IMAP4_SSL('imap.gmail.com', 993)
+        m.login(account, password)
+        log(f"✅ Gmail 登录成功")
+    except Exception as e:
+        log(f"❌ Gmail 登录失败: {e}")
+        return 0
+
+    # 只扫 INBOX（其他文件夹由 Outlook 转发规则处理）
+    folders_to_check = ['INBOX']
+
+    manifest = load_manifest()
+    total_new = 0
+
+    for folder in folders_to_check:
+        try:
+            m.select(folder)
+        except Exception as e:
+            continue
+
+        status, msgs = m.search(None, "ALL")
+        if status != "OK" or not msgs[0]:
+            continue
+
+        email_ids = msgs[0].split()
+        folder_new = 0
+
+        for eid in email_ids:
+            try:
+                status, raw = m.fetch(eid, "(RFC822)")
+                if status != "OK" or not raw: continue
+                msg = email.message_from_bytes(raw[0][1])
+                subject = decode_header_value(msg.get("Subject", ""))
+                sender = decode_header_value(msg.get("From", ""))
+                msg_id = msg.get("Message-ID", "") or str(eid)
+                key = f"gmail:{account}:{msg_id}"
+
+                if key in manifest.get("emails", {}): continue
+
+                # 匹配发件人
+                sender_lower = sender.lower()
+                sender_match = any(s.lower() in sender_lower for s in senders)
+                if not sender_match: continue
+
+                log(f"  ✅ 匹配 [{folder}]: {subject[:50]}")
+
+                if dry_run:
+                    folder_new += 1
+                    continue
+
+                body = extract_body(msg)
+                if not body:
+                    log(f"  ⚠️ 正文为空: {subject[:30]}")
+                    continue
+
+                date_str = datetime.now().strftime("%Y%m%d")
+                safe = re.sub(r"[^\w\s-]", "", subject)
+                safe = re.sub(r"[\s_]+", "-", safe).strip("-").lower()[:30]
+                filename = f"email-{date_str}-{safe}.txt"
+                filepath = RAW_DIR / filename
+                c = 1
+                while filepath.exists():
+                    filename = f"email-{date_str}-{safe}-{c}.txt"
+                    filepath = RAW_DIR / filename
+                    c += 1
+
+                content = f"""# {subject}
+
+> **发件人:** {sender}
+> **收件时间:** {msg.get("Date", "Unknown")}
+> **邮件ID:** {key}
+> **来源文件夹:** {folder}
+
+---
+
+{body}
+"""
+                filepath.write_text(content, encoding="utf-8")
+                log(f"  📄 已保存: {filename}")
+
+                if "emails" not in manifest: manifest["emails"] = {}
+                manifest["emails"][key] = {
+                    "subject": subject, "sender": sender,
+                    "filename": filename, "folder": folder,
+                    "saved_at": datetime.now().isoformat(),
+                }
+                folder_new += 1
+
+            except Exception as e:
+                continue
+
+        if folder_new > 0:
+            log(f"  📁 [{folder}] 新增 {folder_new} 封")
+            total_new += folder_new
+
+    manifest["last_run"] = datetime.now().isoformat()
+    save_manifest(manifest)
+    m.logout()
+
+    if dry_run:
+        log(f"🔍 干跑: 共匹配 {total_new} 封新邮件")
+    else:
+        log(f"✅ Gmail 入库完成: {total_new} 封新邮件 → raw/")
+        append_log(f"Gmail 邮件入库 {total_new} 封")
+
+    if total_new > 0 and not dry_run:
+        subprocess.Popen(
+            [sys.executable, str(VAULT_ROOT / "auto_ingest.py"), str(VAULT_ROOT)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+
+    return total_new
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="多渠道内容入库")
-    parser.add_argument("--channel", choices=["feishu", "feishu-doc", "url", "watcher", "email"],
+    parser.add_argument("--channel", choices=["feishu", "feishu-doc", "url", "watcher", "email", "gmail"],
                         required=True, help="入库渠道")
     parser.add_argument("--chat-id", help="飞书 chat_id (feishu 渠道)")
     parser.add_argument("--since", type=int, default=30, help="回查分钟数 (feishu 渠道)")
@@ -775,6 +960,15 @@ def main():
         channel_email(
             account=args.account, password=args.password,
             folder=args.folder, senders=args.senders or None,
+            dry_run=args.dry_run,
+        )
+    elif args.channel == "gmail":
+        if not args.account or not args.password:
+            print("ERROR: --account and --password required for gmail channel", file=sys.stderr)
+            sys.exit(2)
+        channel_gmail(
+            account=args.account, password=args.password,
+            senders=args.senders or ["superlinear", "memo"],
             dry_run=args.dry_run,
         )
 
