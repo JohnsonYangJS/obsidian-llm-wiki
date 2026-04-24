@@ -47,7 +47,7 @@ def generate_summary_llm(text: str, title: str,
 {{"summary": "一段200-400字的中文摘要，涵盖文章的核心观点和关键信息", "concepts": ["概念1", "概念2", "概念3", "概念4", "概念5"]}}"""
 
     payload = {
-        "model": "MiniMax-M2.5",
+        "model": "MiniMax-M2.7-highspeed",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 1000,
         "temperature": 0.3,
