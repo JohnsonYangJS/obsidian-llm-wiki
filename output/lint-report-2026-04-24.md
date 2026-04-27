@@ -1,0 +1,173 @@
+# Lint Report — 2026-04-24
+
+## Summary
+- Total issues: 158
+- Dead links: 123
+- Orphan pages: 4
+- Missing index entries: 26
+- Frequently linked but missing: 4
+- Semantic contradictions: N/A
+
+## Details
+
+- 🔴 Dead link: wiki/queries/2026-04-24-auto_query修复任务完成.md → [[extract_json函数重写]]
+- 🔴 Dead link: wiki/queries/2026-04-24-auto_query修复任务完成.md → [[Q&A数据处理]]
+- 🔴 Dead link: wiki/queries/2026-04-24-auto_query修复任务完成.md → [[API集成测试]]
+- 🔴 Dead link: wiki/queries/2026-04-24-auto_query修复任务完成.md → [[reply_to_current]]
+- 🔴 Dead link: wiki/queries/2026-04-24-auto_query修复任务完成.md → [[extract_json函数重写]]
+- 🔴 Dead link: wiki/queries/2026-04-24-auto_query修复任务完成.md → [[Q&A数据处理]]
+- 🔴 Dead link: wiki/queries/2026-04-24-auto_query修复任务完成.md → [[API集成测试]]
+- 🔴 Dead link: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md → [[仓库隐私设置]]
+- 🔴 Dead link: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md → [[敏感信息清理]]
+- 🔴 Dead link: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md → [[开源最佳实践]]
+- 🔴 Dead link: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md → [[reply_to_current]]
+- 🔴 Dead link: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md → [[仓库隐私设置]]
+- 🔴 Dead link: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md → [[敏感信息清理]]
+- 🔴 Dead link: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md → [[开源最佳实践]]
+- 🔴 Dead link: wiki/queries/2026-04-24-max-30-characters.md → [[auto_query.py]]
+- 🔴 Dead link: wiki/queries/2026-04-24-max-30-characters.md → [[API 代理问题]]
+- 🔴 Dead link: wiki/queries/2026-04-24-max-30-characters.md → [[curl + 干净环境变量]]
+- 🔴 Dead link: wiki/queries/2026-04-24-max-30-characters.md → [[reply_to_current]]
+- 🔴 Dead link: wiki/queries/2026-04-24-max-30-characters.md → [[auto_query.py]]
+- 🔴 Dead link: wiki/queries/2026-04-24-max-30-characters.md → [[API 代理问题]]
+- 🔴 Dead link: wiki/queries/2026-04-24-max-30-characters.md → [[curl + 干净环境变量]]
+- 🔴 Dead link: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md → [[仓库公开化]]
+- 🔴 Dead link: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md → [[敏感信息清理]]
+- 🔴 Dead link: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md → [[工作区配置分享]]
+- 🔴 Dead link: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md → [[reply_to_current]]
+- 🔴 Dead link: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md → [[仓库公开化]]
+- 🔴 Dead link: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md → [[敏感信息清理]]
+- 🔴 Dead link: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md → [[工作区配置分享]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-code-analysis-v260411.md → [[overrides]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-code-analysis-v260411.md → [[python]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-code-analysis-v260411.md → [[vector]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-code-analysis-v260411.md → [[embedding]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-code-analysis-v260411.md → [[systems]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-the-complete-guide-v260411.md → [[signal]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-the-complete-guide-v260411.md → [[read]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-the-complete-guide-v260411.md → [[port]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-the-complete-guide-v260411.md → [[costs]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-the-complete-guide-v260411.md → [[workspace]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-the-complete-guide-v260411.md → [[email]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-the-complete-guide-v260411.md → [[neck]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-the-complete-guide-v260411.md → [[head]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-the-complete-guide-v260411.md → [[meant]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-the-complete-guide-v260411.md → [[touch]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-pm-copilot我尝试为自己打造的agent.md → [[assets]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-pm-copilot我尝试为自己打造的agent.md → [[circle]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-pm-copilot我尝试为自己打造的agent.md → [[reply]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-pm-copilot我尝试为自己打造的agent.md → [[superlinear]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-pm-copilot我尝试为自己打造的agent.md → [[academy]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-the-complete-guide-v260407.md → [[researches]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-the-complete-guide-v260407.md → [[didn]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-the-complete-guide-v260407.md → [[trust]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-the-complete-guide-v260407.md → [[version]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-the-complete-guide-v260407.md → [[topic]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-搜索-问问-gemini.md → [[notification]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-搜索-问问-gemini.md → [[circle]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-搜索-问问-gemini.md → [[notifications]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-搜索-问问-gemini.md → [[april]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-搜索-问问-gemini.md → [[reply]]
+- 🔴 Dead link: wiki/articles/summaries/赖翔-llm-wiki模式.md → [[wiki]]
+- 🔴 Dead link: wiki/articles/summaries/赖翔-llm-wiki模式.md → [[title]]
+- 🔴 Dead link: wiki/articles/summaries/赖翔-llm-wiki模式.md → [[复刻]]
+- 🔴 Dead link: wiki/articles/summaries/赖翔-llm-wiki模式.md → [[大神的]]
+- 🔴 Dead link: wiki/articles/summaries/赖翔-llm-wiki模式.md → [[模式]]
+- 🔴 Dead link: wiki/articles/summaries/graphifykarpathy-知识库工作流的终极进化.md → [[first]]
+- 🔴 Dead link: wiki/articles/summaries/graphifykarpathy-知识库工作流的终极进化.md → [[opencode]]
+- 🔴 Dead link: wiki/articles/summaries/graphifykarpathy-知识库工作流的终极进化.md → [[gemini]]
+- 🔴 Dead link: wiki/articles/summaries/graphifykarpathy-知识库工作流的终极进化.md → [[aider]]
+- 🔴 Dead link: wiki/articles/summaries/graphifykarpathy-知识库工作流的终极进化.md → [[cursor]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-从入门到精通-v260407.md → [[子agent]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-从入门到精通-v260407.md → [[local]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-从入门到精通-v260407.md → [[settings]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-从入门到精通-v260407.md → [[话题]]
+- 🔴 Dead link: wiki/articles/summaries/hermes-agent-从入门到精通-v260407.md → [[python]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-v100.md → [[橙皮书]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-v100.md → [[文件夹]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-v100.md → [[笔记也链接了它]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-v100.md → [[shift]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-v100.md → [[公众号写作]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-complete-guide-zh-v140.md → [[dingtalk]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-complete-guide-zh-v140.md → [[read]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-complete-guide-zh-v140.md → [[signal]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-complete-guide-zh-v140.md → [[anthropic]]
+- 🔴 Dead link: wiki/articles/summaries/openclaw-complete-guide-zh-v140.md → [[ai进化论]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-the-complete-guide-v260411.md → [[maybe]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-the-complete-guide-v260411.md → [[video]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-the-complete-guide-v260411.md → [[plugin]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-the-complete-guide-v260411.md → [[brightness]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-the-complete-guide-v260411.md → [[social]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-analysis-zh-v260411.md → [[套上]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-analysis-zh-v260411.md → [[taor]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-analysis-zh-v260411.md → [[的问题]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-analysis-zh-v260411.md → [[reason]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-source-analysis-zh-v260411.md → [[支持]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-ai板块正式命名为superlinear-ai并限时开.md → [[reply]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-ai板块正式命名为superlinear-ai并限时开.md → [[发在]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-ai板块正式命名为superlinear-ai并限时开.md → [[有灵魂]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-ai板块正式命名为superlinear-ai并限时开.md → [[的算命师]]
+- 🔴 Dead link: wiki/articles/summaries/email-20260424-转发-ai板块正式命名为superlinear-ai并限时开.md → [[http]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了.md → [[fill]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了.md → [[width]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了.md → [[version]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了.md → [[height]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了.md → [[xmlns]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-the-complete-guide-v100.md → [[video]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-the-complete-guide-v100.md → [[orange]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-the-complete-guide-v100.md → [[draft]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-the-complete-guide-v100.md → [[model]]
+- 🔴 Dead link: wiki/articles/summaries/obsidian-ai-the-complete-guide-v100.md → [[files]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-complete-guide-zh-v260411.md → [[它能]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-complete-guide-zh-v260411.md → [[橙皮书]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-complete-guide-zh-v260411.md → [[视频创作]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-complete-guide-zh-v260411.md → [[huashu]]
+- 🔴 Dead link: wiki/articles/summaries/claude-code-complete-guide-zh-v260411.md → [[homepage]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-complete-guide-zh-v200.md → [[你的]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-complete-guide-zh-v200.md → [[poly]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-complete-guide-zh-v200.md → [[usdc]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-complete-guide-zh-v200.md → [[polymarket]]
+- 🔴 Dead link: wiki/articles/summaries/polymarket-complete-guide-zh-v200.md → [[橙皮书]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw搭了个个人知识管理神器自动同步get笔记到obsidian双向链接自动生成效率直接拉满.md → [[无上清凉]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw搭了个个人知识管理神器自动同步get笔记到obsidian双向链接自动生成效率直接拉满.md → [[2026年4月12日]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw搭了个个人知识管理神器自动同步get笔记到obsidian双向链接自动生成效率直接拉满.md → [[封面]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw搭了个个人知识管理神器自动同步get笔记到obsidian双向链接自动生成效率直接拉满.md → [[https]]
+- 🔴 Dead link: wiki/articles/summaries/我用openclaw搭了个个人知识管理神器自动同步get笔记到obsidian双向链接自动生成效率直接拉满.md → [[mmbiz]]
+- 🟡 Orphan page: wiki/queries/2026-04-24-auto_query修复任务完成.md
+- 🟡 Orphan page: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md
+- 🟡 Orphan page: wiki/queries/2026-04-24-max-30-characters.md
+- 🟡 Orphan page: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md
+- 🟡 Not in index: wiki/queries/2026-04-24-auto_query修复任务完成.md
+- 🟡 Not in index: wiki/queries/2026-04-24-Private仓库转Public的风险与清理建议.md
+- 🟡 Not in index: wiki/queries/index.md
+- 🟡 Not in index: wiki/queries/2026-04-24-max-30-characters.md
+- 🟡 Not in index: wiki/queries/2026-04-24-仓库Public化风险与清理建议.md
+- 🟡 Not in index: wiki/articles/summaries/全网爆火的大模型ai知识库保姆级教程来了.md
+- 🟡 Not in index: wiki/articles/summaries/claude-code-source-code-analysis-v260411.md
+- 🟡 Not in index: wiki/articles/summaries/openclaw-the-complete-guide-v260411.md
+- 🟡 Not in index: wiki/articles/summaries/polymarket-the-complete-guide-v260411.md
+- 🟡 Not in index: wiki/articles/summaries/email-20260424-转发-pm-copilot我尝试为自己打造的agent.md
+- 🟡 Not in index: wiki/articles/summaries/hermes-agent-the-complete-guide-v260407.md
+- 🟡 Not in index: wiki/articles/summaries/email-20260424-搜索-问问-gemini.md
+- 🟡 Not in index: wiki/articles/summaries/赖翔-llm-wiki模式.md
+- 🟡 Not in index: wiki/articles/summaries/graphifykarpathy-知识库工作流的终极进化.md
+- 🟡 Not in index: wiki/articles/summaries/hermes-agent-从入门到精通-v260407.md
+- 🟡 Not in index: wiki/articles/summaries/obsidian-ai-v100.md
+- 🟡 Not in index: wiki/articles/summaries/openclaw-complete-guide-zh-v140.md
+- 🟡 Not in index: wiki/articles/summaries/claude-code-the-complete-guide-v260411.md
+- 🟡 Not in index: wiki/articles/summaries/claude-code-source-analysis-zh-v260411.md
+- 🟡 Not in index: wiki/articles/summaries/email-20260424-转发-ai板块正式命名为superlinear-ai并限时开.md
+- 🟡 Not in index: wiki/articles/summaries/email-20260424-转发-this-week-on-superlinear-ac.md
+- 🟡 Not in index: wiki/articles/summaries/我用openclaw把flomoobsidianget笔记和ima知识库串起来了.md
+- 🟡 Not in index: wiki/articles/summaries/obsidian-ai-the-complete-guide-v100.md
+- 🟡 Not in index: wiki/articles/summaries/claude-code-complete-guide-zh-v260411.md
+- 🟡 Not in index: wiki/articles/summaries/polymarket-complete-guide-zh-v200.md
+- 🟡 Not in index: wiki/articles/summaries/我用openclaw搭了个个人知识管理神器自动同步get笔记到obsidian双向链接自动生成效率直接拉满.md
+- 🟡 Missing page but linked often: [[reply_to_current]] (4x)
+- 🟡 Missing page but linked often: [[敏感信息清理]] (4x)
+- 🟡 Missing page but linked often: [[reply]] (3x)
+- 🟡 Missing page but linked often: [[橙皮书]] (3x)
+- 🟡 log/ issue: log/20260424.md — expected H1 '# 2026-04-24'
+
+---
+*Generated by lint_wiki.py at 2026-04-24T18:21:08.991984*
