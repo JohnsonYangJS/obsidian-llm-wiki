@@ -747,7 +747,7 @@ def channel_gmail(account: str, password: str,
     if senders is None:
         senders = ["superlinear", "memo"]
     if subject_keywords is None:
-        # Subject 关键词：匹配转发邮件的主题头（如"转发: Superlinear Academy..."）
+        # Subject 关键词：Hotmail 转发后 From 变成自己，改为匹配 Subject
         subject_keywords = ["superlinear", "memo", "vcsmemo", "this week on", "ai板块"]
 
     log(f"📧 Gmail 入库: {account}")
@@ -824,14 +824,18 @@ def channel_gmail(account: str, password: str,
     manifest = load_manifest()
     total_new = 0
 
+    # 搜索 FROM txyjs@outlook.com：所有 Hotmail 转发邮件，全部入库
+    # Gmail IMAP 支持 CHARSET UTF-8
+
     for folder in folders_to_check:
         try:
             m.select(folder)
         except Exception as e:
             continue
 
-        status, msgs = m.search(None, "ALL")
-        if status != "OK" or not msgs[0]:
+        # 直接搜索所有 Hotmail 转发邮件
+        status, msgs = m.search('UTF-8', 'FROM "txyjs@outlook.com"')
+        if status != 'OK' or not msgs[0]:
             continue
 
         email_ids = msgs[0].split()
@@ -849,12 +853,7 @@ def channel_gmail(account: str, password: str,
 
                 if key in manifest.get("emails", {}): continue
 
-                # 匹配发件人或 Subject 关键词（转发邮件 From 变了，要靠 Subject 匹配）
-                sender_lower = sender.lower()
-                subject_lower = subject.lower()
-                sender_match = any(s.lower() in sender_lower for s in senders)
-                subject_match = any(kw.lower() in subject_lower for kw in subject_keywords)
-                if not (sender_match or subject_match): continue
+                # 来自 txyjs@outlook.com 的邮件已通过 IMAP 搜索过滤，直接入库
 
                 log(f"  ✅ 匹配 [{folder}]: {subject[:50]}")
 
