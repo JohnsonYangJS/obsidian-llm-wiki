@@ -740,12 +740,15 @@ def channel_email(account: str, password: str, folder: str = "AI",
 # ── Channel 6: Gmail 邮件入库 ──────────────────────────────────────────────
 
 def channel_gmail(account: str, password: str,
-                  senders: list = None, dry_run: bool = False):
+                  senders: list = None, subject_keywords: list = None, dry_run: bool = False):
     import email, email.header, imaplib, re
     from html import parser as html_parser
 
     if senders is None:
         senders = ["superlinear", "memo"]
+    if subject_keywords is None:
+        # Subject 关键词：匹配转发邮件的主题头（如"转发: Superlinear Academy..."）
+        subject_keywords = ["superlinear", "memo", "vcsmemo", "this week on", "ai板块"]
 
     log(f"📧 Gmail 入库: {account}")
 
@@ -808,7 +811,7 @@ def channel_gmail(account: str, password: str,
         return ""
 
     try:
-        m = imaplib.IMAP4_SSL('imap.gmail.com', 993)
+        import socks, socket; socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 7890); socket.socket = socks.socksocket; m = imaplib.IMAP4_SSL('imap.gmail.com', 993)
         m.login(account, password)
         log(f"✅ Gmail 登录成功")
     except Exception as e:
@@ -846,10 +849,12 @@ def channel_gmail(account: str, password: str,
 
                 if key in manifest.get("emails", {}): continue
 
-                # 匹配发件人
+                # 匹配发件人或 Subject 关键词（转发邮件 From 变了，要靠 Subject 匹配）
                 sender_lower = sender.lower()
+                subject_lower = subject.lower()
                 sender_match = any(s.lower() in sender_lower for s in senders)
-                if not sender_match: continue
+                subject_match = any(kw.lower() in subject_lower for kw in subject_keywords)
+                if not (sender_match or subject_match): continue
 
                 log(f"  ✅ 匹配 [{folder}]: {subject[:50]}")
 
@@ -936,6 +941,7 @@ def main():
     parser.add_argument("--password", help="邮箱密码或 App Password (email 渠道)")
     parser.add_argument("--folder", default="AI", help="邮件文件夹 (email 渠道，默认: AI)")
     parser.add_argument("--senders", nargs="+", help="匹配发件人 (email 渠道)")
+    parser.add_argument("--subject-keywords", nargs="+", help="匹配 Subject 关键词 (gmail 渠道)")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -969,6 +975,7 @@ def main():
         channel_gmail(
             account=args.account, password=args.password,
             senders=args.senders or ["superlinear", "memo"],
+            subject_keywords=args.subject_keywords or None,
             dry_run=args.dry_run,
         )
 
